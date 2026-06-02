@@ -25,6 +25,15 @@
         (c          "https://github.com/tree-sitter/tree-sitter-c"          "v0.23.6")
         (cpp        "https://github.com/tree-sitter/tree-sitter-cpp"        "v0.23.4")))
 
+(setq major-mode-remap-alist
+      '((ruby-mode	. ruby-ts-mode)
+        (js-json-mode	. json-ts-mode)
+        (css-mode	. css-ts-mode)
+        (js-mode	. js-ts-mode)
+        (c-mode		. c-ts-mode)
+        (c++-mode	. c++-ts-mode)
+	(c-or-c++-mode	. c-or-c++-ts-mode)))
+
 (defun core-treesit-auto-install ()
   "Compile and install missing Tree-sitter grammars."
   (interactive)
@@ -33,36 +42,28 @@
       (message "Compiling grammar: %s" lang)
       (treesit-install-language-grammar lang))))
 
-(core-treesit-auto-install)
-
-(setq major-mode-remap-alist
-      '((ruby-mode    . ruby-ts-mode)
-        (js-json-mode . json-ts-mode)
-        (css-mode     . css-ts-mode)
-        (js-mode      . js-ts-mode)
-        (c-mode       . c-ts-mode)
-        (c++-mode     . c++-ts-mode)))
-
 ;;; LSP (Eglot)
 
-(use-package eglot
-  :hook ((go-ts-mode              . eglot-ensure)
-	 (ruby-ts-mode            . eglot-ensure)
-	 ((c-ts-mode c++-ts-mode) . eglot-ensure))
-  :custom
-  (eglot-autoshutdown t)
-  (eglot-sync-connect 0)
-  (eglot-extend-to-xref t)
-  (eglot-send-changes-idle-time 0.1)
-  (eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
-  :config
+(setq eglot-autoshutdown t)
+(setq eglot-sync-connect 0)
+(setq eglot-extend-to-xref t)
+(setq eglot-send-changes-idle-time 0.1)
+(setq eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
+
+(add-hook 'go-ts-mode-hook #'eglot-ensure)
+(add-hook 'ruby-ts-mode-hook #'eglot-ensure)
+(add-hook 'c-ts-mode-hook #'eglot-ensure)
+(add-hook 'c++-ts-mode-hook #'eglot-ensure)
+(add-hook 'c-or-c++-ts-mode-hook #'eglot-ensure)
+
+(with-eval-after-load 'eglot
   (fset #'jsonrpc--log-event #'ignore)
   (add-to-list 'eglot-stay-out-of 'font-lock)
 
   ;; C/C++
   (add-to-list 'eglot-server-programs
                '((c-ts-mode c++-ts-mode)
-                 . ("clangd"
+		 . ("clangd"
                     "--background-index"
                     "--pch-storage=memory"
                     "--clang-tidy"
@@ -79,9 +80,7 @@
   ;; RUBY
   (add-to-list 'eglot-server-programs
 	       '((ruby-mode ruby-ts-mode)
-		 . "ruby-lsp"))
-
-  )
+		 . "ruby-lsp")))
 
 ;;; Shared Styles
 
@@ -97,9 +96,10 @@
 
 ;;; Languages
 
-;; shell
+;; Shell
 (add-hook 'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
 
+;; Go configuration
 (use-package go-ts-mode
   :defer t
   :mode ("\\.go\\'" "/go\\.mod\\'" "/go\\.work\\'")
@@ -112,6 +112,7 @@
                                          (eglot-code-action-organize-imports (point-min) (point-max)))))
                                    nil t)))))
 
+;; C/C++ configuration
 (use-package c-ts-mode
   :defer t
   :custom
@@ -140,7 +141,7 @@
 
 ;;; Project scaffolding
 
-;; C/C++
+;; C/C++ scaffold
 (defun core-scaffold-c-project (dir type)
   "Scaffold new C or C++ TYPE project in DIR.
 Create optimal .clangd and .clang-format files for Eglot, following Rob Pike/Go style."
@@ -181,6 +182,7 @@ ColumnLimit: 100\n"))
     (find-file main-file)
     (message "Project %s initialized in %s!" type dir)))
 
+;; Go scaffold
 (defun core-scaffold-go-project (dir mod-name)
   "Scaffold a Go module in DIR with name MOD-NAME."
   (interactive

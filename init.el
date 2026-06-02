@@ -57,7 +57,9 @@
 (load-theme 'ascetic-dark t)
 
 (require 'core-editing)
+
 (require 'core-languages)
+(core-treesit-auto-install)		; auto install all langs
 
 ;;; UI & MONOCHROME PHILOSOPHY
 
