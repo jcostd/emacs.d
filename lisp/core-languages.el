@@ -44,21 +44,24 @@
 
 ;;; LSP (Eglot)
 
-(setq eglot-autoshutdown t)
-(setq eglot-sync-connect 0)
-(setq eglot-extend-to-xref t)
-(setq eglot-send-changes-idle-time 0.1)
-(setq eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
-
-(add-hook 'go-ts-mode-hook #'eglot-ensure)
-(add-hook 'ruby-ts-mode-hook #'eglot-ensure)
-(add-hook 'c-ts-mode-hook #'eglot-ensure)
-(add-hook 'c++-ts-mode-hook #'eglot-ensure)
-(add-hook 'c-or-c++-ts-mode-hook #'eglot-ensure)
+(setq eglot-autoshutdown t
+      eglot-sync-connect 0
+      eglot-extend-to-xref t
+      eglot-send-changes-idle-time 0.1
+      eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
 
 (with-eval-after-load 'eglot
   (fset #'jsonrpc--log-event #'ignore)
   (add-to-list 'eglot-stay-out-of 'font-lock)
+
+  (defun core--eglot-format-on-save ()
+    (when (eglot-managed-p)
+      (ignore-errors (eglot-format-buffer))))
+
+  (defun core--eglot-organize-imports-on-save ()
+    (when (eglot-managed-p)
+      (ignore-errors
+        (eglot-code-action-organize-imports (point-min) (point-max)))))
 
   ;; C/C++
   (add-to-list 'eglot-server-programs
@@ -79,53 +82,81 @@
                     (:staticcheck t :gofumpt t))))
   ;; RUBY
   (add-to-list 'eglot-server-programs
-	       '((ruby-mode ruby-ts-mode)
-		 . "ruby-lsp")))
+	       '((ruby-mode ruby-ts-mode) "ruby-lsp")))
 
 ;;; Shared Styles
 
-(defun core-apply-pike-style ()
-  "Applies Rob Pike's standard: 8-width hardware tabs and auto-format on save."
+(defun core--apply-pike-style ()
+  "Applies Rob Pike's standard: 8-width hardware tabs."
   (setq-local indent-tabs-mode t)
-  (setq-local tab-width 8)
-  (add-hook 'before-save-hook
-            (lambda ()
-              (when (eglot-managed-p)
-                (ignore-errors (eglot-format-buffer))))
-            10 t))
+  (setq-local tab-width 8))
+
+(defun core--apply-lsp-setup ()
+  "Applies format and organize import on save"
+  (add-hook 'before-save-hook #'core--eglot-format-on-save 10 t)
+  (add-hook 'before-save-hook #'core--eglot-organize-imports-on-save nil t))
 
 ;;; Languages
 
 ;; Shell
+
 (add-hook 'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
 
 ;; Go configuration
-(use-package go-ts-mode
-  :defer t
-  :mode ("\\.go\\'" "/go\\.mod\\'" "/go\\.work\\'")
-  :hook ((go-ts-mode . core-apply-pike-style)
-         (go-ts-mode . (lambda ()
-                         (add-hook 'before-save-hook
-                                   (lambda ()
-                                     (when (eglot-managed-p)
-                                       (ignore-errors
-                                         (eglot-code-action-organize-imports (point-min) (point-max)))))
-                                   nil t)))))
+
+(defun core--apply-golang-setup ()
+  "Golang editor configuration."
+  (eglot-ensure)
+  (core--apply-pike-style)
+  (core--apply-lsp-setup))
+
+(add-to-list 'auto-mode-alist '("\\.go\\'" . go-ts-mode))
+(add-to-list 'auto-mode-alist '("/go\\.mod\\'" . go-ts-mode))
+(add-to-list 'auto-mode-alist '("/go\\.work\\'" . go-ts-mode))
+
+(add-hook 'go-ts-mode-hook #'core--apply-golang-setup)
 
 ;; C/C++ configuration
-(use-package c-ts-mode
-  :defer t
-  :custom
-  (c-ts-mode-indent-style 'k&r)
-  (c-ts-mode-indent-offset 8)
-  :hook ((c-ts-mode c++-ts-mode) . core-apply-pike-style))
 
-(use-package yaml-ts-mode :defer t :mode "\\.ya?ml\\'")
-(use-package json-ts-mode :defer t :mode "\\.json\\'")
-(use-package dockerfile-ts-mode :defer t :mode "\\(?:Dockerfile\\(?:\\..*\\)?\\|\\.[Dd]ockerfile\\)\\'")
-(use-package js-ts-mode :defer t :mode "\\.m?js\\'" :hook (js-ts-mode . eglot-ensure))
+(defun core--apply-c-c++-setup ()
+  "C/C++ editor configuration."
+  (eglot-ensure)
+  (core--apply-pike-style)
+  (core--apply-lsp-setup))
 
-;;; Web (Fallback)
+(setq c-ts-mode-indent-style 'k&r)
+(setq c-ts-mode-indent-offset 8)
+
+(add-hook 'c-ts-mode-hook #'core--apply-c-c++-setup)
+(add-hook 'c++-ts-mode-hook #'core--apply-c-c++-setup)
+(add-hook 'c-or-c++-ts-mode-hook #'core--apply-c-c++-setup)
+
+;; Ruby configuration
+
+(defun core--apply-ruby-setup ()
+  "Ruby editor configuration."
+  (eglot-ensure)
+  (core--apply-lsp-setup))
+
+(add-hook 'ruby-ts-mode-hook #'core--apply-ruby-setup)
+
+;; Javascript configuration
+
+(add-to-list 'auto-mode-alist '("\\.m?js\\'" . js-ts-mode))
+
+;; YAML configuration
+
+(add-to-list 'auto-mode-alist '("\\.ya?ml\\'" . yaml-ts-mode))
+
+;; JSON configuration
+
+(add-to-list 'auto-mode-alist '("\\.json\\'" . json-ts-mode))
+
+;; Docker files configuration
+
+(add-to-list 'auto-mode-alist '("\\(?:Dockerfile\\(?:\\..*\\)?\\|\\.[Dd]ockerfile\\)\\'" . dockerfile-ts-mode))
+
+;; Web (Fallback)
 
 (use-package web-mode
   :ensure t
