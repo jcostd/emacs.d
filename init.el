@@ -192,10 +192,13 @@
 
 ;; buffer completion
 
-(setq completion-styles '(basic substring partial-completion flex)
+(setq completion-styles '(basic partial-completion substring)
       completion-auto-help nil
       completions-detailed nil
       completion-cycle-threshold nil)
+
+(setq completion-category-defaults nil
+      completion-category-overrides nil)
 
 (setq completion-ignore-case t
       read-buffer-completion-ignore-case t
