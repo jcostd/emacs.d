@@ -33,10 +33,16 @@
 (setq ffap-machine-p-known 'reject)
 
 ;;; PACKAGE & MODULE LOADER
-
 (require 'package)
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+
+(setq package-selected-packages
+	     '(go-mode
+	       json-mode
+	       yaml-mode
+	       web-mode))
+
 (package-initialize)
+(package-install-selected-packages t)
 
 ;; Load external core modules & secrets
 (defun core-load-if-exists (file)
@@ -58,19 +64,19 @@
 
 (require 'core-editing)
 
-(require 'core-languages)
-(core-treesit-auto-install)		; auto install all langs
-
 ;;; UI & MONOCHROME PHILOSOPHY
+
+(setq mode-line-compact t)
 
 (setq inhibit-startup-screen t
       inhibit-startup-message t
-      initial-scratch-message ";; Happy Hacking!\n\n"
-      use-short-answers t
-      echo-keystrokes 0.1
-      visible-bell nil
-      ring-bell-function #'ignore
+      initial-scratch-message ";; Happy Hacking!\n\n")
+
+(setq use-short-answers t
       use-dialog-box nil)
+
+(setq visible-bell nil
+      ring-bell-function #'ignore)
 
 (setq-default cursor-in-non-selected-windows nil)
 (setq highlight-nonselected-windows nil)
@@ -126,6 +132,8 @@
 (dolist (dir '("backups"
                "auto-save-list"
                "tramp-auto-save"
+	       "remember"
+	       "url"
                "games/shared-score"
                "games/user-score"))
   (make-directory (expand-file-name dir core-state-dir) t))
@@ -136,6 +144,17 @@
       savehist-file (core-state-file "history")
       bookmark-default-file (core-state-file "bookmarks")
       project-list-file (core-state-file "projects")
+
+      ;; DIARY
+      diary-file (core-state-file "diary")
+
+      ;; REMEMBER
+      remember-data-directory (core-state-file "remember/")
+      remember-data-file (core-state-file "notes")
+
+      ;; EWW & URL
+      eww-bookmarks-directory core-state-dir
+      url-configuration-directory (core-state-file "url/")
 
       ;; GAMES
       shared-game-score-directory (core-state-file "games/shared-score")
@@ -182,6 +201,11 @@
 (setq global-auto-revert-non-file-buffers t)
 (global-auto-revert-mode 1)
 
+;; remember
+(keymap-global-set "C-x M-r" #'remember)
+(with-eval-after-load 'remember
+  (add-to-list 'remember-handler-functions 'remember-diary-extract-entries))
+
 ;; tramp
 (setq tramp-default-method "ssh")
 (with-eval-after-load 'tramp
@@ -190,7 +214,7 @@
 		vc-ignore-dir-regexp
 		tramp-file-name-regexp)))
 
-;; buffer completion
+;;; BUFFER COMPLETION
 
 (setq completion-styles '(basic partial-completion substring)
       completion-auto-help nil
@@ -205,6 +229,9 @@
       read-file-name-completion-ignore-case t
       read-extended-command-predicate #'command-completion-default-include-p)
 
+(minibuffer-depth-indicate-mode)
+(setq enable-recursive-minibuffers t)
+
 ;; Shield minibuffer prompt from cursor.
 (setq minibuffer-prompt-properties '(read-only t intangible t cursor-intangible t face minibuffer-prompt))
 (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
@@ -213,7 +240,7 @@
 (require 'ascetic-plumber)
 (ascetic-read-mode 1)
 
-;; in-buffer completion
+;;; IN-BUFFER COMPLETION
 (setq completion-preview-minimum-symbol-length 2)
 (setq completion-preview-idle-delay 0.15)
 
@@ -262,15 +289,18 @@
     (window-height . 0.2))))
 
 ;; tab-bar
-(setq tab-bar-show 1)
-(setq tab-bar-close-button-show nil)
-(setq tab-bar-new-button-show nil)
-(setq tab-bar-new-tab-choice "*scratch*")
-(setq tab-bar-tab-hints t)
-(setq tab-bar-format '(tab-bar-format-tabs tab-bar-format-align-right tab-bar-format-global))
-
 (keymap-global-set "M-[" #'tab-bar-history-back)
 (keymap-global-set "M-]" #'tab-bar-history-forward)
+
+(setq tab-bar-show 1
+      tab-bar-close-button-show nil
+      tab-bar-new-button-show nil
+      tab-bar-new-tab-choice "*scratch*"
+      tab-bar-tab-hints t
+      tab-bar-format
+      '(tab-bar-format-tabs
+	tab-bar-format-align-right
+	tab-bar-format-global))
 
 (tab-bar-mode 1)
 (tab-bar-history-mode 1)
@@ -318,15 +348,110 @@
   (add-to-list 'project-vc-extra-root-markers "go.mod"))
 
 ;; compilation
-(setq compilation-scroll-output t)
-(setq compilation-always-kill t)
-(setq compilation-skip-threshold 2)
-(setq compilation-ask-about-save nil)
+(setq compilation-scroll-output t
+      compilation-always-kill t
+      compilation-skip-threshold 2
+      compilation-ask-about-save nil)
+
 (add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
 
 ;; version control
-(setq vc-follow-symlinks t)
-(setq vc-git-diff-switches '("--histogram"))
+(setq vc-follow-symlinks t
+      vc-git-diff-switches '("--histogram"))
+
+;; eglot lsp
+(setq eglot-autoshutdown t
+      eglot-sync-connect 0
+      eglot-extend-to-xref t
+      eglot-send-changes-idle-time 0.1
+      eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
+
+(with-eval-after-load 'eglot
+  (fset #'jsonrpc--log-event #'ignore)
+  (add-to-list 'eglot-stay-out-of 'font-lock)
+
+  (defun core--eglot-format-on-save ()
+    (when (eglot-managed-p)
+      (ignore-errors (eglot-format-buffer))))
+
+  (defun core--eglot-organize-imports-on-save ()
+    (when (eglot-managed-p)
+      (ignore-errors
+        (eglot-code-action-organize-imports (point-min) (point-max)))))
+
+  (defun core--apply-lsp-setup ()
+    "Applies format and organize import on save"
+    (add-hook 'before-save-hook #'core--eglot-format-on-save 10 t)
+    (add-hook 'before-save-hook #'core--eglot-organize-imports-on-save nil t))
+
+  ;; C/C++
+  (add-to-list 'eglot-server-programs
+               '((c-ts-mode c++-ts-mode)
+		 . ("clangd"
+                    "--background-index"
+                    "--pch-storage=memory"
+                    "--clang-tidy"
+                    "--header-insertion=iwyu"
+                    "--completion-style=bundled"
+		    "--fallback-style=LLVM")))
+
+  ;; GO
+  (add-to-list 'eglot-server-programs
+               '((go-ts-mode go-mod-ts-mode go-work-ts-mode)
+		 . ("gopls"
+		    :initializationOptions
+                    (:staticcheck t :gofumpt t))))
+  ;; RUBY
+  (add-to-list 'eglot-server-programs
+	       '((ruby-mode ruby-ts-mode) "ruby-lsp")))
+
+;;; Data/Text
+
+;; LaTeX
+(setq tex-bibtex-command "biber")
+
+(add-hook 'latex-mode-hook 'turn-on-reftex)
+
+(setq reftex-save-parse-info t
+      reftex-use-multiple-selection-buffers t
+      reftex-plug-into-AUCTeX nil
+      reftex-bibliography-commands
+      '("bibliography"
+	"nobibliography"
+	"addbibresource"))
+
+;;; Languages
+
+;; Shell
+(add-hook 'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
+
+;; C/C++
+(defun core--apply-pike-style ()
+  "Applies Rob Pike's standard: 8-width hardware tabs."
+  (setq-local indent-tabs-mode t)
+  (setq-local tab-width 8))
+
+(setq c-basic-offset 8)
+(setq c-default-style '((c-mode		.	"k&r")
+			(c++-mode	.	"stroustrup")
+			(java-mode	.	"java")
+			(awk-mode	.	"awk")
+			(other		.	"gnu")))
+(add-hook 'c-mode-hook #'core--apply-pike-style)
+
+;; Golang
+(add-hook 'go-mode-hook #'core--apply-pike-style)
+
+;; Web
+(setq web-mode-markup-indent-offset 2
+      web-mode-css-indent-offset 2
+      web-mode-code-indent-offset 2
+      web-mode-enable-auto-pairing t
+      web-mode-enable-current-element-highlight nil)
+(add-to-list 'auto-mode-alist '("\\.erb\\'" . web-mode))
+(add-to-list 'auto-mode-alist '("\\.[jt]sx\\'" . web-mode))
+
+(require 'misc-scaffold)
 
 ;; Loaded last to ensure system modifications don't override manual config.
 (when (file-exists-p custom-file)
