@@ -5,15 +5,14 @@
 ;; License: GNU General Public License version 3 (or later)
 
 ;;; Commentary:
-;; Primary theme.  Positive polarity is faster and more accurate
-;; (Buchner 2007, Piepenbrock 2013) at every ambient level.
+;; Reference polarity.  Positive polarity reads faster and more
+;; accurately at every ambient level (Buchner 2007, Piepenbrock 2013);
+;; the dark theme locks hue to these values and inverts L*.
 ;; Requires lisp/ on `load-path' before load.
-;; Reference polarity: the dark theme locks hue to these values and
-;; inverts L*, except rule, which is matched on Lc.
-;; Signal urgency, top down: alarm figure literal caution mute.
+;;
 ;; Deutan-fragile pairs need 8 L*: literal/caution 7.9, caution/mute
-;; 4.8 -- the latter rides on chroma.  figure/literal share L* and are
-;; held apart by hue alone, dE2000 31.
+;; 4.8 -- the latter rides on chroma.  figure and literal share L* and
+;; are held apart by hue alone, dE2000 31.
 
 ;;; Code:
 

@@ -42,6 +42,9 @@
 ;; Set as frame parameters, not modes: no redisplay, no chrome flash.
 ;; Colours match ascetic-dark to kill the white flash before load-theme.
 
+;; X resources become frame params and outrank theme faces.
+(setq inhibit-x-resources t)
+
 (dolist (param '((menu-bar-lines . 0)
                  (tool-bar-lines . 0)
                  (vertical-scroll-bars)
@@ -73,6 +76,5 @@
 
 (setq native-comp-async-report-warnings-errors 'silent)
 (setq warning-suppress-log-types '((comp)))
-(setq inhibit-startup-echo-area-message (user-login-name))
 
 ;;; early-init.el ends here

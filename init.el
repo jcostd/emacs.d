@@ -1,4 +1,4 @@
-;;; init.el --- My Core Configuration (Emacs 30.2) -*- lexical-binding: t; -*-
+;;; init.el --- Core configuration (Emacs 30.2) -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 Jacopo Costantini
 
@@ -6,456 +6,328 @@
 ;; License: GNU General Public License version 3 (or later)
 
 ;;; Commentary:
-;; Core configuration. Acme philosophy: text is text.
-;; Predictability, speed, minimalism.
-;; Native features > external bloatware.
+;; Acme philosophy: text is text.  Built-in over external.
+;; Structure via regexp font-lock; no tree-sitter by design.
+;; Sections follow boot order.  Modes are switched on last.
 
 ;;; Code:
 
-;;; BOOTSTRAP & ENGINE
+;;; ENGINE
 
 (prefer-coding-system 'utf-8)
 
-;; IPC/Network throughput. Critical for LSP/Eglot speed.
-(setq read-process-output-max (* 4 1024 1024))
+;; LSP throughput.  Both knobs, or neither.
+(setq read-process-output-max (* 4 1024 1024)
+      process-adaptive-read-buffering nil)
 
-;; GC limits: allow 16MB allocations before pausing.
-(add-hook 'emacs-startup-hook
-          (lambda () (setq gc-cons-threshold (* 16 1024 1024))))
+(setq redisplay-skip-fontification-on-input t  ; no font-lock mid-keystroke
+      ffap-machine-p-known 'reject             ; no DNS from ffap
+      trusted-content (list user-emacs-directory))
 
-;; Defer major-mode hook execution on raw buffers.
-(setq initial-major-mode 'fundamental-mode)
+;;; PACKAGES
 
-;; Anti-stutter: halt font-lock during rapid keystrokes.
-(setq redisplay-skip-fontification-on-input t)
-
-;; Network timeout avoidance.
-(setq ffap-machine-p-known 'reject)
-
-;;; PACKAGE & MODULE LOADER
 (require 'package)
-
-(setq package-selected-packages
-	     '(go-mode
-	       json-mode
-	       yaml-mode
-	       web-mode))
-
+(setq package-selected-packages '(go-mode yaml-mode web-mode))
 (package-initialize)
 (package-install-selected-packages t)
 
-;; Load external core modules & secrets
+;; lisp/ must precede load-theme: the themes require ascetic-theme.
+(add-to-list 'load-path (locate-user-emacs-file "lisp"))
+(add-to-list 'custom-theme-load-path (locate-user-emacs-file "themes"))
+
+;;; LOCAL FILES
+;; Custom loads here, not last: last loader wins, and
+;; package-selected-packages is a defcustom.
+
 (defun core-load-if-exists (file)
-  (when (file-exists-p file)
-    (load file nil t)))
+  (when (file-exists-p file) (load file nil t)))
 
-(core-load-if-exists
- (expand-file-name "local.el" user-emacs-directory)) ; machine local config
+(setq custom-file (locate-user-emacs-file "custom.el"))
 
-(core-load-if-exists
- (expand-file-name "secrets.el" user-emacs-directory)) ; user secrets
+(dolist (f '("local.el" "secrets.el" "custom.el"))
+  (core-load-if-exists (locate-user-emacs-file f)))
+
+;;; THEME
+;; Light is registered but not enabled: toggle-theme needs both
+;; variants known, and exactly one active.
 
 (setq custom-safe-themes t)
-(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
-
-(add-to-list 'custom-theme-load-path (expand-file-name "themes" user-emacs-directory))
 (load-theme 'ascetic-light t t)
 (load-theme 'ascetic-dark t)
-(require 'ascetic-theme)
 
-(require 'core-editing)
+(keymap-global-set "<f5>" #'toggle-theme)
 
-;;; UI & MONOCHROME PHILOSOPHY
-
-(setq mode-line-compact t)
-
-(setq inhibit-startup-screen t
-      inhibit-startup-message t
-      initial-scratch-message ";; Happy Hacking!\n\n")
-
-(setq use-short-answers t
-      use-dialog-box nil)
-
-(setq visible-bell nil
-      ring-bell-function #'ignore)
+(setq mode-line-compact t
+      inhibit-startup-screen t
+      initial-scratch-message ";; Happy Hacking!\n\n"
+      use-short-answers t
+      ring-bell-function #'ignore
+      highlight-nonselected-windows nil)
 
 (setq-default cursor-in-non-selected-windows nil)
-(setq highlight-nonselected-windows nil)
 
-;; highlight current line
-(global-hl-line-mode 1)
+;;; EDITING
 
-;;; CORE EDITING PRIMITIVES
+(require 'ascetic-edit)
 
-;; Clipboard rules
+;; C-c + letter is the user's; C-c + control char belongs to major modes.
+(keymap-global-set "C-c d"        #'duplicate-dwim)
+(keymap-global-set "C-c D"        #'ascetic-edit-duplicate-and-comment)
+(keymap-global-set "M-<up>"       #'ascetic-edit-move-up)
+(keymap-global-set "M-<down>"     #'ascetic-edit-move-down)
+(keymap-global-set "C-<return>"   #'ascetic-edit-open-below)
+(keymap-global-set "C-S-<return>" #'ascetic-edit-open-above)
+(keymap-global-set "M-k"          #'ascetic-edit-delete)
+(keymap-global-set "M-'"          #'ascetic-edit-surround)
+(keymap-global-set "M-i"          ascetic-edit-inner-map)
+(keymap-global-set "M-J"          #'delete-indentation)
+(keymap-global-set "M-z"          #'zap-up-to-char)
+(keymap-global-set "C-x K"        #'kill-current-buffer)
+
 (setq save-interprogram-paste-before-kill t
-      kill-do-not-save-duplicates t)
+      kill-do-not-save-duplicates t
+      require-final-newline t
+      sentence-end-double-space nil
+      scroll-conservatively 101          ; no vscroll jumps
+      auto-window-vscroll nil
+      repeat-exit-timeout 3
+      repeat-exit-key (kbd "RET")
+      undo-limit        (* 13 160000)
+      undo-strong-limit (* 13 240000)
+      undo-outer-limit  (* 13 24000000))
 
-;; Formatting boundaries
 (setq-default fill-column 80)
 (add-hook 'text-mode-hook #'auto-fill-mode)
-(add-hook 'before-save-hook #'delete-trailing-whitespace)
-(setq sentence-end-double-space nil)
 
-;; State management
-(setq undo-limit (* 13 160000)
-      undo-strong-limit (* 13 240000)
-      undo-outer-limit (* 13 24000000))
+;; Ours only: other people's diffs stay clean.
+(defun core--trim-on-save ()
+  (add-hook 'before-save-hook #'delete-trailing-whitespace nil t))
+(add-hook 'prog-mode-hook #'core--trim-on-save)
 
-;; Deterministic scrolling (no vscroll jumps)
-(setq scroll-conservatively 101
-      auto-window-vscroll nil)
+(dolist (cmd '(narrow-to-region upcase-region downcase-region))
+  (put cmd 'disabled nil))
 
-;; Native minor modes
-(delete-selection-mode 1)
-(electric-pair-mode 1)
-(global-subword-mode 1)
-(global-so-long-mode 1)
+;;; FILES
+;; Emacs 30 already keeps places, history, bookmarks, recentf, projects
+;; and tramp state under `user-emacs-directory'.  Only redirect what
+;; would otherwise land next to someone else's source.
 
-;; Enable disabled native commands
-(put 'narrow-to-region 'disabled nil)
-(put 'upcase-region 'disabled nil)
-(put 'downcase-region 'disabled nil)
-
-;; repeat
-(setq repeat-exit-timeout 3)
-(setq repeat-exit-key (kbd "RET"))
-(repeat-mode 1)
-
-;;; FILESYSTEM & I/O
-
-(defvar core-state-dir (expand-file-name "var/" user-emacs-directory))
-(make-directory core-state-dir t)
-
-(defun core-state-file (name)
-  (expand-file-name name core-state-dir))
-
-(dolist (dir '("backups"
-               "auto-save-list"
-               "tramp-auto-save"
-	       "remember"
-	       "url"
-               "games/shared-score"
-               "games/user-score"))
-  (make-directory (expand-file-name dir core-state-dir) t))
-
-(setq custom-file (core-state-file "custom.el")
-      save-place-file (core-state-file "places")
-      recentf-save-file (core-state-file "recentf")
-      savehist-file (core-state-file "history")
-      bookmark-default-file (core-state-file "bookmarks")
-      project-list-file (core-state-file "projects")
-
-      ;; DIARY
-      diary-file (core-state-file "diary")
-
-      ;; REMEMBER
-      remember-data-directory (core-state-file "remember/")
-      remember-data-file (core-state-file "notes")
-
-      ;; EWW & URL
-      eww-bookmarks-directory core-state-dir
-      url-configuration-directory (core-state-file "url/")
-
-      ;; GAMES
-      shared-game-score-directory (core-state-file "games/shared-score")
-      gamegrid-user-score-file-directory (core-state-file "games/user-score")
-
-      ;; TRAMP
-      tramp-persistency-file-name (core-state-file "tramp")
-      tramp-auto-save-directory (core-state-file "tramp-auto-save/"))
-
-;; Disable symlink lockfiles (.#file) - fatal for web bundlers
-(setq create-lockfiles nil)
-
-;; backups
-(setq backup-by-copying t)
-(setq backup-directory-alist `(("." . ,(core-state-file "backups"))))
-
-;; autosave
-(setq auto-save-list-file-prefix (core-state-file "auto-save-list/.saves-"))
-(setq auto-save-file-name-transforms `((".*" ,(core-state-file "auto-save-list/") t)))
-
-;; history tracking
-(setq history-length 100)
-(savehist-mode 1)
-
-;; recent files
-(setq recentf-keep '(file-remote-p file-readable-p))
-(setq recentf-max-saved-items 100)
-(recentf-mode 1)
-
-;; save place
-(setq save-place-limit 500)
-(save-place-mode 1)
-
-;; uniquify buffer names
-(setq uniquify-buffer-name-style 'forward
+(setq create-lockfiles nil               ; .#file symlinks break web bundlers
+      backup-by-copying t
+      backup-directory-alist `(("." . ,(locate-user-emacs-file "backups")))
+      auto-save-file-name-transforms
+      `((".*" ,(locate-user-emacs-file "auto-save-list/") t))
+      delete-by-moving-to-trash t
+      history-length 100
+      save-place-limit 500
+      recentf-max-saved-items 100
+      recentf-keep '(file-remote-p file-readable-p)
+      auto-revert-verbose nil
+      global-auto-revert-non-file-buffers t
+      uniquify-buffer-name-style 'forward
       uniquify-separator "/"
       uniquify-after-kill-buffer-p t
       uniquify-ignore-buffers-re "^\\*")
 
-(keymap-global-set "C-c r" #'rename-visited-file)
-
-;; autorevert
-(setq auto-revert-verbose nil)
-(setq global-auto-revert-non-file-buffers t)
-(global-auto-revert-mode 1)
-
-;; remember
-(keymap-global-set "C-x M-r" #'remember)
-(with-eval-after-load 'remember
-  (add-to-list 'remember-handler-functions 'remember-diary-extract-entries))
-
-;; tramp
 (setq tramp-default-method "ssh")
 (with-eval-after-load 'tramp
   (setq vc-ignore-dir-regexp
-	(format "\\(%s\\)\\|\\(%s\\)"
-		vc-ignore-dir-regexp
-		tramp-file-name-regexp)))
+        (format "\\(%s\\)\\|\\(%s\\)" vc-ignore-dir-regexp tramp-file-name-regexp)))
 
-;;; BUFFER COMPLETION
+(keymap-global-set "C-c r" #'rename-visited-file)
+
+;;; COMPLETION
 
 (setq completion-styles '(basic partial-completion substring)
       completion-auto-help nil
       completions-detailed nil
-      completion-cycle-threshold nil)
-
-(setq completion-category-defaults nil
-      completion-category-overrides nil)
-
-(setq completion-ignore-case t
+      completion-cycle-threshold nil
+      completion-category-defaults nil
+      completion-category-overrides nil
+      completion-ignore-case t
       read-buffer-completion-ignore-case t
       read-file-name-completion-ignore-case t
-      read-extended-command-predicate #'command-completion-default-include-p)
+      read-extended-command-predicate #'command-completion-default-include-p
+      enable-recursive-minibuffers t
+      completion-preview-minimum-symbol-length 2
+      completion-preview-idle-delay 0.15)
 
-(minibuffer-depth-indicate-mode)
-(setq enable-recursive-minibuffers t)
-
-;; Shield minibuffer prompt from cursor.
-(setq minibuffer-prompt-properties '(read-only t intangible t cursor-intangible t face minibuffer-prompt))
+;; Shield the prompt from the cursor.
+(setq minibuffer-prompt-properties
+      '(read-only t intangible t cursor-intangible t face minibuffer-prompt))
 (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
 
 (require 'ascetic-read)
 (require 'ascetic-plumber)
-(ascetic-read-mode 1)
-
-;;; IN-BUFFER COMPLETION
-(setq completion-preview-minimum-symbol-length 2)
-(setq completion-preview-idle-delay 0.15)
 
 (with-eval-after-load 'completion-preview
-  (when (boundp 'completion-preview-active-mode-map)
-    (keymap-set completion-preview-active-mode-map "M-n" #'completion-preview-next-candidate)
-    (keymap-set completion-preview-active-mode-map "M-p" #'completion-preview-prev-candidate)
-    (keymap-set completion-preview-active-mode-map "M-i" #'completion-preview-complete)))
+  ;; M-i belongs to core-edit-inner-map; a minor-mode map would steal it.
+  (keymap-set completion-preview-active-mode-map "M-n" #'completion-preview-next-candidate)
+  (keymap-set completion-preview-active-mode-map "M-p" #'completion-preview-prev-candidate)
+  (keymap-set completion-preview-active-mode-map "C-;" #'completion-preview-complete))
 
-(global-completion-preview-mode 1)
+;;; WINDOWS
 
-;; quick expansion
-(keymap-global-set "M-/" #'hippie-expand)
-(setq hippie-expand-try-functions-list
-      '(try-expand-dabbrev
-        try-expand-dabbrev-all-buffers
-        try-expand-dabbrev-from-kill
-        try-complete-file-name-partially
-        try-complete-file-name))
-
-;;; WINDOWS & WORKSPACES
-
-;; window movements
 (windmove-default-keybindings)
-
-;; window history
-(winner-mode 1)
 
 (setq switch-to-buffer-obey-display-actions t
       window-combination-resize t
-      help-window-select t)
-
-;; window rules
-(setq display-buffer-alist
- '(("\\*\\(Help\\|Apropos\\|info\\|Messages\\|Warnings\\|Compile-Log\\)\\*"
-    (display-buffer-reuse-window display-buffer-at-bottom)
-    (window-height . 0.3)
-    (reusable-frames . visible))
-   ;; Cattura *compilation*, ma anche *Plumber Stream* e *Plumber: ...*
-   ("\\*\\(compilation\\|Plumber.*\\)\\*"
-    (display-buffer-reuse-window display-buffer-at-bottom)
-    (window-height . 0.3)
-    (reusable-frames . visible))
-   ("\\*Completions\\*"
-    (display-buffer-reuse-window display-buffer-at-bottom)
-    (window-height . 0.2))))
-
-;; tab-bar
-(keymap-global-set "M-[" #'tab-bar-history-back)
-(keymap-global-set "M-]" #'tab-bar-history-forward)
-
-(setq tab-bar-show 1
+      help-window-select t
+      ibuffer-expert t
+      ibuffer-show-empty-filter-groups nil
+      ediff-diff-options "-w"
+      ediff-window-setup-function #'ediff-setup-windows-plain
+      ediff-split-window-function #'split-window-horizontally
+      tab-bar-show 1
       tab-bar-close-button-show nil
       tab-bar-new-button-show nil
       tab-bar-new-tab-choice "*scratch*"
       tab-bar-tab-hints t
-      tab-bar-format
-      '(tab-bar-format-tabs
-	tab-bar-format-align-right
-	tab-bar-format-global))
+      tab-bar-format '(tab-bar-format-tabs))
 
-(tab-bar-mode 1)
-(tab-bar-history-mode 1)
-
-;; ediff
-(setq ediff-diff-options "-w"
-      ediff-window-setup-function 'ediff-setup-windows-plain
-      ediff-split-window-function 'split-window-horizontally)
-
-;; ibuffer
-(setq ibuffer-expert t
-      ibuffer-show-empty-filter-groups nil)
+(setq display-buffer-alist
+      '(("\\*\\(Help\\|Apropos\\|info\\|Messages\\|Warnings\\|Compile-Log\\)\\*"
+         (display-buffer-reuse-window display-buffer-at-bottom)
+         (window-height . 0.3)
+         (reusable-frames . visible))
+        ;; compilation, grep, xref, and the plumber's sinks
+        ("\\*\\(compilation\\|grep\\|xref\\|Plumber.*\\)\\*"
+         (display-buffer-reuse-window display-buffer-at-bottom)
+         (window-height . 0.3)
+         (reusable-frames . visible))))
 
 (keymap-global-set "C-x C-b" #'ibuffer)
 
-;;; DEV TOOLS & WORKFLOW
+;;; TOOLS
 
-;; line number
-(setq display-line-numbers-width 3)
-(setq display-line-numbers-grow-only t)
+(setq display-line-numbers-width 3
+      display-line-numbers-grow-only t
+      isearch-lax-whitespace t
+      isearch-lazy-count t
+      lazy-count-prefix-format "[%s of %s] "
+      grep-use-headings t                ; 30: hits grouped under a file heading
+      project-mode-line t
+      compilation-scroll-output t
+      compilation-always-kill t
+      compilation-skip-threshold 2
+      compilation-ask-about-save nil
+      compilation-hidden-output '("^make\\[[0-9]+\\]: .*\n")
+      vc-follow-symlinks t
+      vc-git-diff-switches '("--histogram"))
+
 (add-hook 'prog-mode-hook #'display-line-numbers-mode)
+(add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
+(add-hook 'emacs-lisp-mode-hook #'outline-minor-mode)  ; ;;; headers fold
 
-;; searching
-(setq search-highlight t)
-(setq isearch-lax-whitespace t)
-(setq isearch-lazy-count t)
-(setq lazy-count-prefix-format "[%s of %s] ")
-
-;; dired
-(setq dired-listing-switches "-AFlbhv --group-directories-first")
-(setq dired-omit-files "^\\.?#\\|^\\.[a-zA-Z0-9]+\\|\\.DS_Store$\\|\\.class$")
-(setq dired-recursive-copies 'always
-      dired-recursive-deletes 'always
-      delete-by-moving-to-trash t
-      dired-dwim-target t)
-(add-hook 'dired-mode-hook #'dired-omit-mode)
-
-;; which key
-(setq which-key-idle-delay 0.5)
-(which-key-mode 1)
-
-;; project.el
-(setq project-mode-line t)
 (with-eval-after-load 'project
   (add-to-list 'project-vc-extra-root-markers "go.mod"))
 
-;; compilation
-(setq compilation-scroll-output t
-      compilation-always-kill t
-      compilation-skip-threshold 2
-      compilation-ask-about-save nil)
+;; 29: .c <-> .h without ff-find-other-file.
+(setq find-sibling-rules '(("\\([^/]+\\)\\.c\\'" "\\1.h")
+                           ("\\([^/]+\\)\\.h\\'" "\\1.c")))
+(keymap-global-set "C-x M-o" #'find-sibling-file)
 
-(add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
+;; -A shows dotfiles; --group-directories-first is GNU-only.
+(setq dired-listing-switches (if (eq system-type 'gnu/linux)
+                                 "-AFlbhv --group-directories-first"
+                               "-AFlbhv")
+      dired-omit-files "\\`\\.?#\\|\\`\\.\\.?\\'\\|\\.DS_Store\\'\\|\\.class\\'"
+      dired-recursive-copies 'always
+      dired-recursive-deletes 'always
+      dired-dwim-target t)
 
-;; version control
-(setq vc-follow-symlinks t
-      vc-git-diff-switches '("--histogram"))
+(with-eval-after-load 'dired (require 'dired-x))
+(add-hook 'dired-mode-hook #'dired-omit-mode)
 
-;; eglot lsp
+;;; LSP
+
 (setq eglot-autoshutdown t
       eglot-sync-connect 0
       eglot-extend-to-xref t
+      eglot-report-progress nil
       eglot-send-changes-idle-time 0.1
-      eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
+      eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider)
+      ;; 30: supported API, replaces the jsonrpc--log-event fset hack.
+      eglot-events-buffer-config '(:size 0 :format full))
 
 (with-eval-after-load 'eglot
-  (fset #'jsonrpc--log-event #'ignore)
   (add-to-list 'eglot-stay-out-of 'font-lock)
 
-  (defun core--eglot-format-on-save ()
+  (defun core--eglot-format ()
     (when (eglot-managed-p)
       (ignore-errors (eglot-format-buffer))))
 
-  (defun core--eglot-organize-imports-on-save ()
+  (defun core--eglot-organize-imports ()
     (when (eglot-managed-p)
       (ignore-errors
         (eglot-code-action-organize-imports (point-min) (point-max)))))
 
-  (defun core--apply-lsp-setup ()
-    "Applies format and organize import on save"
-    (add-hook 'before-save-hook #'core--eglot-format-on-save 10 t)
-    (add-hook 'before-save-hook #'core--eglot-organize-imports-on-save nil t))
+  (defun core-eglot-setup ()
+    "Imports first, then format.  Depth orders them."
+    (add-hook 'before-save-hook #'core--eglot-organize-imports 0 t)
+    (add-hook 'before-save-hook #'core--eglot-format 10 t))
 
-  ;; C/C++
+  (add-hook 'eglot-managed-mode-hook #'core-eglot-setup)
+
   (add-to-list 'eglot-server-programs
-               '((c-ts-mode c++-ts-mode)
-		 . ("clangd"
-                    "--background-index"
-                    "--pch-storage=memory"
-                    "--clang-tidy"
-                    "--header-insertion=iwyu"
-                    "--completion-style=bundled"
-		    "--fallback-style=LLVM")))
+               '((c-mode c++-mode)
+                 . ("clangd" "--background-index" "--pch-storage=memory"
+                    "--clang-tidy" "--header-insertion=iwyu"
+                    "--completion-style=bundled" "--fallback-style=LLVM")))
 
-  ;; GO
   (add-to-list 'eglot-server-programs
-               '((go-ts-mode go-mod-ts-mode go-work-ts-mode)
-		 . ("gopls"
-		    :initializationOptions
-                    (:staticcheck t :gofumpt t))))
-  ;; RUBY
-  (add-to-list 'eglot-server-programs
-	       '((ruby-mode ruby-ts-mode) "ruby-lsp")))
+               '(go-mode . ("gopls" :initializationOptions
+                            (:staticcheck t :gofumpt t))))
 
-;;; Data/Text
+  (add-to-list 'eglot-server-programs '(ruby-mode . ("ruby-lsp"))))
 
-;; LaTeX
-(setq tex-bibtex-command "biber")
+;;; LANGUAGES
 
-(add-hook 'latex-mode-hook 'turn-on-reftex)
+;; Go: hardware tabs, gofmt does the rest.
+;; C gets "linux", which is already K&R with 8-wide tabs.
+(defun core--go-style ()
+  (setq-local indent-tabs-mode t tab-width 8))
+(add-hook 'go-mode-hook #'core--go-style)
 
-(setq reftex-save-parse-info t
-      reftex-use-multiple-selection-buffers t
-      reftex-plug-into-AUCTeX nil
-      reftex-bibliography-commands
-      '("bibliography"
-	"nobibliography"
-	"addbibresource"))
+(setq c-default-style '((c-mode    . "linux")
+                        (c++-mode  . "stroustrup")
+                        (java-mode . "java")
+                        (awk-mode  . "awk")
+                        (other     . "linux")))
 
-;;; Languages
-
-;; Shell
 (add-hook 'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
 
-;; C/C++
-(defun core--apply-pike-style ()
-  "Applies Rob Pike's standard: 8-width hardware tabs."
-  (setq-local indent-tabs-mode t)
-  (setq-local tab-width 8))
-
-(setq c-basic-offset 8)
-(setq c-default-style '((c-mode		.	"k&r")
-			(c++-mode	.	"stroustrup")
-			(java-mode	.	"java")
-			(awk-mode	.	"awk")
-			(other		.	"gnu")))
-(add-hook 'c-mode-hook #'core--apply-pike-style)
-
-;; Golang
-(add-hook 'go-mode-hook #'core--apply-pike-style)
-
-;; Web
 (setq web-mode-markup-indent-offset 2
       web-mode-css-indent-offset 2
       web-mode-code-indent-offset 2
       web-mode-enable-auto-pairing t
       web-mode-enable-current-element-highlight nil)
+
 (add-to-list 'auto-mode-alist '("\\.erb\\'" . web-mode))
 (add-to-list 'auto-mode-alist '("\\.[jt]sx\\'" . web-mode))
 
-(require 'misc-scaffold)
+(setq tex-bibtex-command "biber")
+(add-hook 'latex-mode-hook #'turn-on-reftex)
 
-;; Loaded last to ensure system modifications don't override manual config.
-(when (file-exists-p custom-file)
-  (load custom-file nil t))
+;;; MODES
+;; Switched on last, so every variable is already set.
+
+(dolist (mode '(delete-selection-mode
+                electric-pair-mode
+                global-subword-mode
+                global-so-long-mode
+                kill-ring-deindent-mode         ; 30: yank without parasite indent
+                global-visual-wrap-prefix-mode  ; 30: native adaptive-wrap
+                repeat-mode
+                savehist-mode
+                recentf-mode
+                save-place-mode
+                global-auto-revert-mode
+                minibuffer-depth-indicate-mode
+                ascetic-read-mode
+                global-completion-preview-mode
+                winner-mode
+                tab-bar-mode))
+  (funcall mode 1))
 
 ;;; init.el ends here

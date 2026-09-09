@@ -15,8 +15,11 @@
 ;;         both polarities.  No name encodes a direction.
 ;; Signal  alarm figure literal caution mute -- ordered by urgency.
 ;;
-;; Contrast figures live next to the colours they describe.  They were
-;; measured with APCA 0.98G-4g; remeasure there if a colour moves.
+;; Contrast figures live beside the colours they describe, measured
+;; with APCA 0.98G-4g.  Remeasure there if a colour moves.
+;;
+;; Do not byte-compile the themes: the macro splices this list at
+;; expansion time, so a stale .elc would freeze the old faces.
 
 ;;; Code:
 
@@ -30,7 +33,6 @@
     `(window-divider-first-pixel ((t :foreground ,rule)))
     `(window-divider-last-pixel  ((t :foreground ,rule)))
     `(fill-column-indicator      ((t :foreground ,rule)))
-    `(hl-line                    ((t :background ,paper-1)))
     `(highlight                  ((t :background ,paper-1)))
     `(region                     ((t :background ,paper-2 :extend t)))
     `(secondary-selection        ((t :background ,paper-1 :extend t)))
@@ -40,10 +42,23 @@
     `(link-visited               ((t :foreground ,figure :underline t)))
     `(line-number                ((t :foreground ,mute)))
     `(line-number-current-line   ((t :foreground ,ink :weight bold)))
-    `(escape-glyph  ((t :foreground ,caution)))
-    `(nobreak-space ((t :foreground ,caution :underline t)))
-    `(homoglyph     ((t :foreground ,caution)))
-    `(glyphless-char ((t :foreground ,mute)))
+    `(escape-glyph               ((t :foreground ,caution)))
+    `(nobreak-space              ((t :foreground ,caution :underline t)))
+    `(homoglyph                  ((t :foreground ,caution)))
+    `(glyphless-char             ((t :foreground ,mute)))
+    ;; boxed and coloured by default, in every *Help* buffer
+    `(help-key-binding ((t :foreground ,literal
+                           :box unspecified :background unspecified)))
+
+    ;; outline-minor-mode is on in elisp; defaults are eight hues
+    `(outline-1 ((t :weight bold)))
+    `(outline-2 ((t :weight bold)))
+    `(outline-3 ((t :weight bold)))
+    `(outline-4 ((t :slant italic)))
+    `(outline-5 ((t :slant italic)))
+    `(outline-6 ((t :slant italic)))
+    `(outline-7 ((t :foreground ,mute)))
+    `(outline-8 ((t :foreground ,mute)))
 
     ;; mode line, header, tabs
     `(mode-line ((t :background ,paper-1 :foreground ,ink
@@ -64,17 +79,14 @@
     `(tab-bar-tab-group-inactive ((t :foreground ,mute :slant italic)))
     `(tab-bar-tab-ungrouped      ((t :foreground ,mute)))
 
-    ;; which-key is built in on 30; its defaults are outside the palette
-    `(which-key-key-face                 ((t :foreground ,literal :weight bold)))
-    `(which-key-command-description-face ((t :foreground ,ink)))
-    `(which-key-group-description-face   ((t :foreground ,figure :weight bold)))
-    `(which-key-separator-face           ((t :foreground ,mute)))
-
     ;; search
     `(isearch             ((t :background ,literal :foreground ,paper :weight bold)))
     `(isearch-fail        ((t :background ,alarm :foreground ,paper)))
     `(lazy-highlight      ((t :background ,paper-1 :foreground ,literal :weight bold)))
     `(match               ((t :background ,paper-1 :foreground ,literal :weight bold)))
+    ;; regexp groups: defaults are saturated
+    `(isearch-group-1     ((t :background ,paper-2 :weight bold)))
+    `(isearch-group-2     ((t :background ,paper-2 :slant italic)))
     `(show-paren-match    ((t :background ,paper-1 :weight bold)))
     `(show-paren-mismatch ((t :background ,alarm :foreground ,paper)))
 
@@ -85,9 +97,6 @@
     `(completions-common-part      ((t :foreground ,literal)))
     `(completions-first-difference ((t :foreground ,alarm :weight bold)))
     `(completions-annotations      ((t :foreground ,mute :slant italic)))
-    `(icomplete-first-match        ((t :weight bold)))
-    `(icomplete-selected-match     ((t :background ,paper-1 :foreground ,literal :weight bold)))
-    `(icomplete-section            ((t :foreground ,mute :slant italic)))
     `(completion-preview           ((t :foreground ,mute :slant italic)))
     `(completion-preview-common    ((t :foreground ,mute :weight bold)))
     `(completion-preview-exact     ((t :foreground ,literal :slant italic)))
@@ -107,9 +116,7 @@
     `(font-lock-comment-delimiter-face ((t :foreground ,mute :slant italic)))
     `(font-lock-doc-face           ((t :foreground ,mute :slant italic)))
     `(font-lock-doc-markup-face    ((t :foreground ,mute :slant italic)))
-    ;; Emacs 30 tree-sitter: call sites are not landmarks
-    `(font-lock-function-call-face ((t :weight normal)))
-    ;; escapes must stay inside the literal, marked by weight
+    ;; escapes stay inside the literal, marked by weight
     `(font-lock-escape-face        ((t :foreground ,literal :weight bold)))
 
     ;; diagnostics
@@ -121,6 +128,11 @@
     `(flymake-warning ((t :underline (:style wave :color ,caution))))
     `(flymake-note    ((t :underline (:style wave :color ,figure))))
     `(eglot-mode-line ((t :weight bold)))
+    ;; lit on every cursor rest: must stay quiet
+    `(eglot-highlight-symbol-face ((t :background ,paper-1 :weight bold)))
+    `(eldoc-highlight-function-argument ((t :weight bold)))
+    `(xref-match       ((t :background ,paper-1 :weight bold)))
+    `(xref-file-header ((t :weight bold)))
     `(compilation-error   ((t :foreground ,alarm   :weight bold)))
     `(compilation-warning ((t :foreground ,caution :weight bold)))
     `(compilation-info    ((t :foreground ,figure  :weight bold)))
@@ -131,9 +143,10 @@
     `(compilation-mode-line-exit ((t :foreground ,literal)))
 
     ;; dired, diff
-    `(dired-directory  ((t :weight bold)))
-    `(dired-symlink    ((t :slant italic)))
-    `(dired-ignored    ((t :foreground ,mute)))
+    `(dired-directory      ((t :weight bold)))
+    `(dired-symlink        ((t :slant italic)))
+    `(dired-broken-symlink ((t :foreground ,alarm :slant italic :weight bold)))
+    `(dired-ignored        ((t :foreground ,mute)))
     `(diff-header      ((t :weight bold)))
     `(diff-file-header ((t :weight bold)))
     `(diff-added       ((t :foreground ,literal)))
@@ -170,8 +183,7 @@
 
 (defmacro ascetic-theme-define (theme &rest palette)
   "Apply `ascetic-theme-faces' to THEME under PALETTE bindings.
-PALETTE is a list of (SYM HEX).  Byte-compile to catch a colour
-that is declared and unused, or used and undeclared."
+PALETTE is a list of (SYM HEX)."
   (declare (indent 1))
   `(let ,palette
      (custom-theme-set-faces ',theme ,@ascetic-theme-faces)))

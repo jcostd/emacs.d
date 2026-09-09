@@ -5,14 +5,14 @@
 ;; License: GNU General Public License version 3 (or later)
 
 ;;; Commentary:
-;; Low-ambient adaptation, not a twin of the light theme.
-;; Hue is locked to ascetic-light; L* is inverted; chroma is capped
-;; by the sRGB gamut, which narrows sharply near white.  The signal
-;; band is therefore compressed to Lc 48-64: order survives, spacing
-;; does not.  Weight and wave underlines carry the rest.
-;; Requires lisp/ on `load-path' before load.
+;; Low-ambient adaptation, not a twin.  Hue is locked to ascetic-light,
+;; L* inverted, chroma capped by the sRGB gamut -- which narrows sharply
+;; near white.  The signal band is therefore compressed to Lc 48-64:
+;; order survives, spacing does not.  Weight and wave underlines carry
+;; the rest.  Requires lisp/ on `load-path' before load.
+;;
 ;; Deutan margins are short here: alarm/literal 3.9 L*, literal/caution
-;; 4.6, caution/mute 2.4.  Bold and wave underlines carry them.
+;; 4.6, caution/mute 2.4.
 
 ;;; Code:
 
