@@ -1,118 +1,46 @@
-;;; ascetic-dark-theme.el --- Ascetic Dark Theme -*- lexical-binding: t; -*-
+;;; ascetic-dark-theme.el --- Ascetic Dark -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2026 by Jacopo Costantini
+;; Copyright (C) 2026 Jacopo Costantini
 ;; Author: Jacopo Costantini <jacopocostantini32@gmail.com>
 ;; License: GNU General Public License version 3 (or later)
 
 ;;; Commentary:
-;; Ascetic: Clarity through renunciation.
-;; A high-contrast, low-noise environment for deep cognition.
+;; Low-ambient adaptation, not a twin of the light theme.
+;; Hue is locked to ascetic-light; L* is inverted; chroma is capped
+;; by the sRGB gamut, which narrows sharply near white.  The signal
+;; band is therefore compressed to Lc 48-64: order survives, spacing
+;; does not.  Weight and wave underlines carry the rest.
+;; Requires lisp/ on `load-path' before load.
+;; Deutan margins are short here: alarm/literal 3.9 L*, literal/caution
+;; 4.6, caution/mute 2.4.  Bold and wave underlines carry them.
 
 ;;; Code:
 
+(require 'ascetic-theme)
+
 ;;;###theme-autoload
 (deftheme ascetic-dark
-  "Clarity through renunciation. A high-contrast, warm low-noise environment."
+  "Clarity through renunciation.  Warm ground, low emission."
   :background-mode 'dark
   :kind 'color-scheme
   :family 'ascetic)
 
-(let ((bg-main              "#1D1B19")
-      (fg-main              "#F0E4D7")
-      (bg-line              "#282522")
-      (bg-modeline          "#2A2620")
-      (bg-modeline-inactive "#201E1B")
-      (border               "#4A4540")
-      (comment              "#9E9488")
-      (string               "#9BB096")
-      (constant             "#9A9070")
-      (error                "#D67C7C")
-      (warning              "#D1A86B")
-      (prompt               "#7A9088")
-      (region               "#3B424D"))
+(ascetic-theme-define ascetic-dark
+  ;; ladder: monotone toward ink, as in light.  rule is matched on Lc,
+  ;; not L* -- reverse polarity compresses, equal steps do not carry
+  ;; equal weight.
+  (paper   "#201D17")   ; L* 11  C* 5  h 88
+  (paper-1 "#29251F")   ; L* 15
+  (paper-2 "#39342C")   ; L* 22
+  (rule    "#665F50")   ; L* 40.6  Lc 18.6
 
-  (custom-theme-set-faces
-   'ascetic-dark
-
-   ;; --- Core UI ---
-   `(default ((t (:background ,bg-main :foreground ,fg-main))))
-   `(cursor ((t (:background ,fg-main :foreground ,bg-main))))
-   `(fringe ((t (:background ,bg-main :foreground ,comment))))
-   `(vertical-border ((t (:foreground ,border))))
-   `(hl-line ((t (:background ,bg-line))))
-   `(region ((t (:background ,region))))
-
-   ;; --- Modeline & Tabs ---
-   `(mode-line-buffer-id ((t (:weight bold))))
-   `(mode-line ((t (:background ,bg-modeline :foreground ,fg-main :box (:line-width -1 :color ,border :style nil)))))
-   `(mode-line-inactive ((t (:background ,bg-modeline-inactive :foreground ,comment :box (:line-width -1 :color ,border :style nil)))))
-   `(tab-bar ((t (:background ,bg-modeline-inactive :foreground ,comment))))
-   `(tab-bar-tab ((t (:background ,bg-modeline :foreground ,fg-main :weight bold :box (:line-width -1 :color ,border :style nil)))))
-   `(tab-bar-tab-inactive ((t (:background ,bg-modeline-inactive :foreground ,comment :box (:line-width -1 :color ,border :style nil)))))
-   `(tab-bar-tab-group-current ((t (:weight bold :foreground ,prompt))))
-   `(tab-bar-tab-group-inactive ((t (:slant italic :foreground ,comment))))
-   `(tab-bar-tab-ungrouped ((t (:foreground ,comment))))
-
-   ;; --- Search & Buffers ---
-   `(isearch ((t (:background ,prompt :foreground ,bg-main :weight bold))))
-   `(lazy-highlight ((t (:background ,bg-line :foreground ,prompt :weight bold))))
-   `(match ((t (:background ,bg-line :foreground ,prompt :weight bold))))
-   `(occur-match-face ((t (:inherit match))))
-   `(occur-target-face ((t (:foreground ,constant :weight bold))))
-   `(compilation-info ((t (:foreground ,constant :weight bold))))
-   `(compilation-line-number ((t (:foreground ,comment))))
-   `(compilation-column-number ((t (:foreground ,comment))))
-
-   ;; --- Prompts & Completion ---
-   `(minibuffer-prompt ((t (:weight bold :foreground ,prompt))))
-   `(eshell-prompt ((t (:weight bold :foreground ,prompt))))
-   `(comint-highlight-prompt ((t (:weight bold :foreground ,prompt))))
-   `(completions-common-part ((t (:foreground ,string))))
-   `(completions-first-difference ((t (:weight bold :foreground ,error))))
-   `(icomplete-first-match ((t (:weight bold))))
-   `(icomplete-selected-match ((t (:background ,bg-line :foreground ,prompt :weight bold))))
-   `(icomplete-section ((t (:slant italic :foreground ,comment))))
-   `(completion-preview ((t (:slant italic :foreground ,comment))))
-   `(completion-preview-common ((t (:weight bold :foreground ,comment))))
-   `(completion-preview-exact ((t (:slant italic :foreground ,prompt))))
-
-   ;; --- Core Syntax & Web Mode ---
-   `(font-lock-keyword-face ((t (:weight bold :foreground unspecified))))
-   `(font-lock-type-face ((t (:weight bold :foreground unspecified))))
-   `(font-lock-function-name-face ((t (:weight bold :foreground unspecified))))
-   `(font-lock-variable-name-face ((t (:foreground unspecified))))
-   `(font-lock-builtin-face ((t (:slant italic :foreground unspecified))))
-   `(font-lock-string-face ((t (:foreground ,string))))
-   `(font-lock-constant-face ((t (:foreground ,constant))))
-   `(font-lock-comment-face ((t (:slant italic :foreground ,comment))))
-   `(font-lock-doc-face ((t (:slant italic :foreground ,comment))))
-
-   `(web-mode-html-tag-face ((t (:weight bold :foreground ,fg-main))))
-   `(web-mode-html-tag-bracket-face ((t (:foreground ,comment))))
-   `(web-mode-html-attr-name-face ((t (:foreground ,fg-main))))
-   `(web-mode-html-attr-value-face ((t (:foreground ,string))))
-   `(web-mode-jsx-tag-face ((t (:weight bold :foreground ,fg-main))))
-   `(web-mode-jsx-attr-name-face ((t (:foreground ,fg-main))))
-   `(web-mode-block-delimiter-face ((t (:weight bold :foreground ,prompt))))
-   `(web-mode-block-control-face ((t (:weight bold :foreground ,fg-main))))
-   `(web-mode-variable-name-face ((t (:foreground ,fg-main))))
-   `(web-mode-symbol-face ((t (:foreground ,constant))))
-   `(web-mode-part-face ((t (:background unspecified))))
-   `(web-mode-block-face ((t (:background unspecified))))
-   `(web-mode-current-element-highlight-face ((t (:background ,bg-line))))
-
-   ;; --- Diagnostics & LSP ---
-   `(error ((t (:foreground ,error :weight bold))))
-   `(warning ((t (:foreground ,warning))))
-   `(success ((t (:foreground ,prompt))))
-   `(eglot-mode-line ((t (:weight bold :foreground ,error))))
-   `(compilation-error ((t (:weight bold :foreground ,error))))
-   `(compilation-warning ((t (:weight bold :foreground ,warning))))))
-
-;;;###theme-autoload
-(when load-file-name
-  (add-to-list 'custom-theme-load-path
-               (file-name-as-directory (file-name-directory load-file-name))))
+  ;; signal: band compressed by gamut, order preserved
+  (ink     "#EDE4DC")   ; 90
+  (alarm   "#FBA59F")   ; 64  h 28   always bold
+  (figure  "#94B3D8")   ; 58  h 265
+  (literal "#98BA90")   ; 58  h 138
+  (caution "#D09A5C")   ; 52  h 72   always bold
+  (mute    "#A49D95"))  ; 48  h 75   always italic
 
 (provide-theme 'ascetic-dark)
 ;;; ascetic-dark-theme.el ends here

@@ -57,10 +57,11 @@
 
 (setq custom-safe-themes t)
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
-(add-to-list 'custom-theme-load-path (expand-file-name "themes" user-emacs-directory))
 
+(add-to-list 'custom-theme-load-path (expand-file-name "themes" user-emacs-directory))
 (load-theme 'ascetic-light t t)
 (load-theme 'ascetic-dark t)
+(require 'ascetic-theme)
 
 (require 'core-editing)
 

@@ -1,4 +1,4 @@
-;;; early-init.el --- Early Startup Optimization -*- lexical-binding: t; -*-
+;;; early-init.el --- Pre-GUI boot -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 Jacopo Costantini
 
@@ -6,48 +6,73 @@
 ;; License: GNU General Public License version 3 (or later)
 
 ;;; Commentary:
-;; Low-level boot optimizations. Executes before GUI initialization
-;; to maximize startup speed, prevent UI flashes, and tweak GC.
+;; Runs before GUI init and before package.el.  Kills startup work,
+;; prevents UI flashes, defers GC.
 
 ;;; Code:
 
+;; package.el is driven manually from init.el.
 (setq package-enable-at-startup nil)
 
-(setq gc-cons-threshold  most-positive-fixnum
-      gc-cons-percentage 1.0)
+;; Prefer .el over stale .elc.
+(setq load-prefer-newer t)
 
+;;; GC & I/O DEFERRAL
+;; Both knobs matter: percentage dominates the threshold.
+
+(defconst core--gc-threshold (* 16 1024 1024))
+(defconst core--gc-percentage 0.1)
 (defvar core--file-name-handler-alist file-name-handler-alist)
-(setq file-name-handler-alist nil)
 
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (setq file-name-handler-alist
-                  (delete-dups (append file-name-handler-alist
-                                       core--file-name-handler-alist)))))
+(setq gc-cons-threshold  most-positive-fixnum
+      gc-cons-percentage 1.0
+      file-name-handler-alist nil)
 
-(push '(menu-bar-lines . 0) default-frame-alist)
-(push '(tool-bar-lines . 0) default-frame-alist)
-(push '(vertical-scroll-bars) default-frame-alist)
-(push '(horizontal-scroll-bars) default-frame-alist)
+(defun core--restore-boot-state ()
+  "Undo boot-time deferrals.  Named, so it can be inspected and removed."
+  (setq gc-cons-threshold  core--gc-threshold
+        gc-cons-percentage core--gc-percentage
+        file-name-handler-alist
+        (delete-dups (append file-name-handler-alist
+                             core--file-name-handler-alist))))
 
-(setq menu-bar-mode    nil
-      tool-bar-mode    nil
-      scroll-bar-mode  nil
-      tooltip-mode     nil
-      use-dialog-box   nil
-      use-file-dialog  nil)
+(add-hook 'emacs-startup-hook #'core--restore-boot-state)
+
+;;; FRAME
+;; Set as frame parameters, not modes: no redisplay, no chrome flash.
+;; Colours match ascetic-dark to kill the white flash before load-theme.
+
+(dolist (param '((menu-bar-lines . 0)
+                 (tool-bar-lines . 0)
+                 (vertical-scroll-bars)
+                 (horizontal-scroll-bars)
+                 (background-color . "#1D1B19")
+                 (foreground-color . "#F0E4D7")))
+  (push param default-frame-alist))
+
+;; Keep the mode vars in sync so the modes never turn themselves on.
+(setq menu-bar-mode   nil
+      tool-bar-mode   nil
+      scroll-bar-mode nil
+      use-dialog-box  nil
+      use-file-dialog nil)
 
 (setq frame-inhibit-implied-resize t
       frame-resize-pixelwise       t
       window-resize-pixelwise      t)
 
+;;; RENDERING
+
 (setq inhibit-compacting-font-caches t)
 
-(setq-default bidi-display-reordering  'left-to-right
-              bidi-paragraph-direction 'left-to-right)
-
+;; No bidi paragraphs in code: skip the paren algorithm.
 (setq bidi-inhibit-bpa t)
+(setq-default bidi-paragraph-direction 'left-to-right)
+
+;;; NOISE
 
 (setq native-comp-async-report-warnings-errors 'silent)
+(setq warning-suppress-log-types '((comp)))
+(setq inhibit-startup-echo-area-message (user-login-name))
 
 ;;; early-init.el ends here
