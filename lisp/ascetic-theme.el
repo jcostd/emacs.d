@@ -17,9 +17,6 @@
 ;;
 ;; Contrast figures live beside the colours they describe, measured
 ;; with APCA 0.98G-4g.  Remeasure there if a colour moves.
-;;
-;; Do not byte-compile the themes: the macro splices this list at
-;; expansion time, so a stale .elc would freeze the old faces.
 
 ;;; Code:
 
@@ -181,12 +178,13 @@
     `(web-mode-current-element-highlight-face ((t :background ,paper-1))))
   "Face specs.  Palette symbols are bound by `ascetic-theme-define'.")
 
-(defmacro ascetic-theme-define (theme &rest palette)
-  "Apply `ascetic-theme-faces' to THEME under PALETTE bindings.
-PALETTE is a list of (SYM HEX)."
+(defun ascetic-theme-define (theme palette)
+  "Apply `ascetic-theme-faces' to THEME.
+PALETTE is a list of (SYM HEX), bound lexically around each spec."
   (declare (indent 1))
-  `(let ,palette
-     (custom-theme-set-faces ',theme ,@ascetic-theme-faces)))
+  (let ((env (mapcar (lambda (p) (cons (car p) (cadr p))) palette)))
+    (apply #'custom-theme-set-faces theme
+           (mapcar (lambda (spec) (eval spec env)) ascetic-theme-faces))))
 
 (provide 'ascetic-theme)
 ;;; ascetic-theme.el ends here

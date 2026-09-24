@@ -25,20 +25,20 @@
   :kind 'color-scheme
   :family 'ascetic)
 
-(ascetic-theme-define ascetic-light
-  ;; ladder: monotone toward ink
-  (paper   "#F5E9D1")   ; L* 92.7  C* 13  h 88
-  (paper-1 "#E9DDC6")   ; L* 88.5
-  (paper-2 "#D9CAAE")   ; L* 82.0
-  (rule    "#BCAF97")   ; L* 72.0
+(ascetic-theme-define 'ascetic-light
+  '(;; ladder: monotone toward ink
+    (paper   "#F5E9D1")   ; L* 92.7  C* 13  h 88
+    (paper-1 "#E9DDC6")   ; L* 88.5
+    (paper-2 "#D9CAAE")   ; L* 82.0
+    (rule    "#BCAF97")   ; L* 72.0
 
-  ;; signal: Lc against paper, ordered by search urgency
-  (ink     "#272320")   ; 90
-  (alarm   "#6F2324")   ; 82
-  (figure  "#325372")   ; 75
-  (literal "#395833")   ; 75  hue-separated from figure
-  (caution "#875A1F")   ; 67  always bold
-  (mute    "#756E67"))  ; 62  always italic
+    ;; signal: Lc against paper, ordered by search urgency
+    (ink     "#272320")   ; 90
+    (alarm   "#6F2324")   ; 82
+    (figure  "#325372")   ; 75
+    (literal "#395833")   ; 75  hue-separated from figure
+    (caution "#875A1F")   ; 67  always bold
+    (mute    "#756E67")))  ; 62  always italic
 
 (provide-theme 'ascetic-light)
 ;;; ascetic-light-theme.el ends here

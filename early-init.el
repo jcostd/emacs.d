@@ -26,7 +26,8 @@
 
 (setq gc-cons-threshold  most-positive-fixnum
       gc-cons-percentage 1.0
-      file-name-handler-alist nil)
+      file-name-handler-alist
+      (list (rassq 'jka-compr-handler file-name-handler-alist)))
 
 (defun core--restore-boot-state ()
   "Undo boot-time deferrals.  Named, so it can be inspected and removed."
@@ -48,10 +49,13 @@
 (dolist (param '((menu-bar-lines . 0)
                  (tool-bar-lines . 0)
                  (vertical-scroll-bars)
-                 (horizontal-scroll-bars)
-                 (background-color . "#1D1B19")
-                 (foreground-color . "#F0E4D7")))
+                 (horizontal-scroll-bars)))
   (push param default-frame-alist))
+
+;; First frame only: frame params outrank theme faces, so in
+;; default-frame-alist every later frame is born dark.
+(setq initial-frame-alist '((background-color . "#201D17")
+                            (foreground-color . "#EDE4DC")))
 
 ;; Keep the mode vars in sync so the modes never turn themselves on.
 (setq menu-bar-mode   nil
@@ -75,6 +79,5 @@
 ;;; NOISE
 
 (setq native-comp-async-report-warnings-errors 'silent)
-(setq warning-suppress-log-types '((comp)))
 
 ;;; early-init.el ends here

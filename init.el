@@ -12,6 +12,9 @@
 
 ;;; Code:
 
+(setq user-full-name "Jacopo Costantini")
+(setq user-mail-address "jacopocostantini32@gmail.com")
+
 ;;; ENGINE
 
 (prefer-coding-system 'utf-8)
@@ -21,41 +24,43 @@
       process-adaptive-read-buffering nil)
 
 (setq redisplay-skip-fontification-on-input t  ; no font-lock mid-keystroke
-      ffap-machine-p-known 'reject             ; no DNS from ffap
-      trusted-content (list user-emacs-directory))
+      ;; abbreviated: trusted-content-p compares against ~/..., not /Users/...
+      trusted-content
+      (list (abbreviate-file-name
+             (file-name-as-directory (file-truename user-emacs-directory)))))
 
 ;;; PACKAGES
+;; Activate light, select last: custom.el loads in between and
+;; must not have the last word on package-selected-packages.
 
 (require 'package)
-(setq package-selected-packages '(go-mode yaml-mode web-mode))
-(package-initialize)
-(package-install-selected-packages t)
+(package-activate-all)
 
 ;; lisp/ must precede load-theme: the themes require ascetic-theme.
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
 (add-to-list 'custom-theme-load-path (locate-user-emacs-file "themes"))
 
-;;; LOCAL FILES
-;; Custom loads here, not last: last loader wins, and
-;; package-selected-packages is a defcustom.
-
-(defun core-load-if-exists (file)
-  (when (file-exists-p file) (load file nil t)))
-
 (setq custom-file (locate-user-emacs-file "custom.el"))
+(dolist (f '("local" "custom"))
+  (load (locate-user-emacs-file f) t t))
 
-(dolist (f '("local.el" "secrets.el" "custom.el"))
-  (core-load-if-exists (locate-user-emacs-file f)))
+(setq package-selected-packages '(go-mode yaml-mode web-mode))
+(unless (seq-every-p #'package-installed-p package-selected-packages)
+  (package-initialize)
+  (package-install-selected-packages t))
 
 ;;; THEME
 ;; Light is registered but not enabled: toggle-theme needs both
 ;; variants known, and exactly one active.
 
-(setq custom-safe-themes t)
 (load-theme 'ascetic-light t t)
 (load-theme 'ascetic-dark t)
 
-(keymap-global-set "<f5>" #'toggle-theme)
+(defun core-toggle-theme ()
+  "Swap ascetic variants.  Ours: no confirmation."
+  (interactive)
+  (theme-choose-variant t))
+(keymap-global-set "<f5>" #'core-toggle-theme)
 
 (setq mode-line-compact t
       inhibit-startup-screen t
@@ -66,28 +71,44 @@
 
 (setq-default cursor-in-non-selected-windows nil)
 
-;;; EDITING
+;;; EDITING POLICY
+;; Chords on letters and on unshifted punctuation only: everything
+;; else costs a Shift on the IT layout.
 
 (require 'ascetic-edit)
 
-;; C-c + letter is the user's; C-c + control char belongs to major modes.
-(keymap-global-set "C-c d"        #'duplicate-dwim)
-(keymap-global-set "C-c D"        #'ascetic-edit-duplicate-and-comment)
-(keymap-global-set "M-<up>"       #'ascetic-edit-move-up)
-(keymap-global-set "M-<down>"     #'ascetic-edit-move-down)
-(keymap-global-set "C-<return>"   #'ascetic-edit-open-below)
-(keymap-global-set "C-S-<return>" #'ascetic-edit-open-above)
-(keymap-global-set "M-k"          #'ascetic-edit-delete)
-(keymap-global-set "M-'"          #'ascetic-edit-surround)
-(keymap-global-set "M-i"          ascetic-edit-inner-map)
-(keymap-global-set "M-J"          #'delete-indentation)
-(keymap-global-set "M-z"          #'zap-up-to-char)
-(keymap-global-set "C-x K"        #'kill-current-buffer)
+;; 29: duplicate-dwim already knows region, rectangle and line.
+;; 30: land on the copy, same column, ready to edit in place.
+(setq duplicate-line-final-position   -1
+      duplicate-region-final-position 1)
+
+(keymap-global-set "M-i"      ascetic-edit-inner-map)
+(keymap-global-set "M-e"      #'ascetic-edit-expand)
+(keymap-global-set "C-a"      #'ascetic-edit-home)
+(keymap-global-set "C-o"      #'ascetic-edit-open-below)
+(keymap-global-set "M-o"      #'ascetic-edit-open-above)
+(keymap-global-set "M-<up>"   #'ascetic-edit-move-up)
+(keymap-global-set "M-<down>" #'ascetic-edit-move-down)
+
+;; C-c LETTER is the user's by convention.  Keep it that way.
+(keymap-global-set "C-c d" #'duplicate-dwim)
+(keymap-global-set "C-c D" #'ascetic-edit-duplicate-and-comment)
+(keymap-global-set "C-c k" #'ascetic-edit-delete)
+(keymap-global-set "C-c s" #'ascetic-edit-surround)
+(keymap-global-set "C-c c" #'ascetic-edit-resurround)
+(keymap-global-set "C-c u" #'ascetic-edit-unsurround)
+(keymap-global-set "C-c a" #'ascetic-edit-number-increase)
+(keymap-global-set "C-c x" #'ascetic-edit-number-decrease)
+
+;; C-/ and C-_ need Shift on the IT layout; C-. and C-, are not ASCII,
+;; so they die in a TTY, and org-mode claims C-, anyway.  C-z only
+;; iconifies a frame here -- C-x C-z still suspends.
+(keymap-global-set "C-z"   #'undo)
+(keymap-global-set "C-M-z" #'undo-redo)
 
 (setq save-interprogram-paste-before-kill t
       kill-do-not-save-duplicates t
       require-final-newline t
-      sentence-end-double-space nil
       scroll-conservatively 101          ; no vscroll jumps
       auto-window-vscroll nil
       repeat-exit-timeout 3
@@ -99,10 +120,41 @@
 (setq-default fill-column 80)
 (add-hook 'text-mode-hook #'auto-fill-mode)
 
-;; Ours only: other people's diffs stay clean.
-(defun core--trim-on-save ()
-  (add-hook 'before-save-hook #'delete-trailing-whitespace nil t))
-(add-hook 'prog-mode-hook #'core--trim-on-save)
+;;; DIAGNOSTICS
+;; Eglot brings flymake with it; elisp has checkers of its own and
+;; nothing was switching them on.  No fringe: the wave is the signal.
+
+(setq flymake-no-changes-timeout 0.5
+      flymake-indicator-type nil)
+
+;; Byte-compile checking runs the buffer's own macros: it needs a
+;; file, and a trusted one.  *scratch* is neither.
+(defun core--elisp-flymake ()
+  (when buffer-file-name (flymake-mode 1)))
+(add-hook 'emacs-lisp-mode-hook #'core--elisp-flymake)
+
+(keymap-global-set "C-c n" #'flymake-goto-next-error)
+(keymap-global-set "C-c p" #'flymake-goto-prev-error)
+
+;;; SHELL
+;; The plumber pipes into processes.  These are that side of the pipe.
+
+(setq shell-command-prompt-show-cwd t
+      async-shell-command-display-buffer nil   ; output lands when it lands
+      shell-kill-buffer-on-exit t
+      comint-prompt-read-only t
+      comint-input-ignoredups t
+      comint-scroll-to-bottom-on-input 'this)
+
+;; Trim only files born clean: other people's diffs stay clean.
+;; Show trailing whitespace either way.
+(defun core--prog-whitespace ()
+  (setq show-trailing-whitespace t)
+  (unless (save-excursion
+            (goto-char (point-min))
+            (re-search-forward "[ \t]+$" nil t))
+    (add-hook 'before-save-hook #'delete-trailing-whitespace nil t)))
+(add-hook 'prog-mode-hook #'core--prog-whitespace)
 
 (dolist (cmd '(narrow-to-region upcase-region downcase-region))
   (put cmd 'disabled nil))
@@ -118,15 +170,12 @@
       auto-save-file-name-transforms
       `((".*" ,(locate-user-emacs-file "auto-save-list/") t))
       delete-by-moving-to-trash t
-      history-length 100
       save-place-limit 500
       recentf-max-saved-items 100
       recentf-keep '(file-remote-p file-readable-p)
       auto-revert-verbose nil
       global-auto-revert-non-file-buffers t
       uniquify-buffer-name-style 'forward
-      uniquify-separator "/"
-      uniquify-after-kill-buffer-p t
       uniquify-ignore-buffers-re "^\\*")
 
 (setq tramp-default-method "ssh")
@@ -140,10 +189,7 @@
 
 (setq completion-styles '(basic partial-completion substring)
       completion-auto-help nil
-      completions-detailed nil
-      completion-cycle-threshold nil
       completion-category-defaults nil
-      completion-category-overrides nil
       completion-ignore-case t
       read-buffer-completion-ignore-case t
       read-file-name-completion-ignore-case t
@@ -154,17 +200,18 @@
 
 ;; Shield the prompt from the cursor.
 (setq minibuffer-prompt-properties
-      '(read-only t intangible t cursor-intangible t face minibuffer-prompt))
+      '(read-only t cursor-intangible t face minibuffer-prompt))
 (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
 
 (require 'ascetic-read)
 (require 'ascetic-plumber)
 
 (with-eval-after-load 'completion-preview
-  ;; M-i belongs to core-edit-inner-map; a minor-mode map would steal it.
+  ;; M-i is ours: text objects
+  (keymap-unset completion-preview-active-mode-map "M-i" t)
   (keymap-set completion-preview-active-mode-map "M-n" #'completion-preview-next-candidate)
   (keymap-set completion-preview-active-mode-map "M-p" #'completion-preview-prev-candidate)
-  (keymap-set completion-preview-active-mode-map "C-;" #'completion-preview-complete))
+  (keymap-set completion-preview-active-mode-map "M-TAB" #'completion-preview-complete))
 
 ;;; WINDOWS
 
@@ -186,12 +233,10 @@
       tab-bar-format '(tab-bar-format-tabs))
 
 (setq display-buffer-alist
-      '(("\\*\\(Help\\|Apropos\\|info\\|Messages\\|Warnings\\|Compile-Log\\)\\*"
-         (display-buffer-reuse-window display-buffer-at-bottom)
-         (window-height . 0.3)
-         (reusable-frames . visible))
-        ;; compilation, grep, xref, and the plumber's sinks
-        ("\\*\\(compilation\\|grep\\|xref\\|Plumber.*\\)\\*"
+      `((,(rx "*" (or "Help" "Apropos" "info" "Messages" "Warnings"
+                      "Compile-Log" "compilation" "grep" "xref"
+                      (seq (or "Man " "Plumber") (* nonl)))
+              "*")
          (display-buffer-reuse-window display-buffer-at-bottom)
          (window-height . 0.3)
          (reusable-frames . visible))))
@@ -200,9 +245,14 @@
 
 ;;; TOOLS
 
+(setq Man-notify-method 'aggressive)
+(keymap-global-set "C-c m" #'man)
+
+(keymap-global-set "C-c b" #'recompile)   ; the one you press fifty times
+(keymap-global-set "C-c B" #'compile)     ; the one that asks
+
 (setq display-line-numbers-width 3
       display-line-numbers-grow-only t
-      isearch-lax-whitespace t
       isearch-lazy-count t
       lazy-count-prefix-format "[%s of %s] "
       grep-use-headings t                ; 30: hits grouped under a file heading
@@ -239,6 +289,17 @@
 (with-eval-after-load 'dired (require 'dired-x))
 (add-hook 'dired-mode-hook #'dired-omit-mode)
 
+(setq wdired-allow-to-change-permissions t)
+
+;; The layout is immutable, echo area included.
+(setq eldoc-echo-area-use-multiline-p nil
+      eldoc-idle-delay 0.2)
+
+;; 29: show the opener without splitting anything.
+(setq show-paren-context-when-offscreen 'overlay)
+
+(setq savehist-additional-variables '(kill-ring search-ring regexp-search-ring))
+
 ;;; LSP
 
 (setq eglot-autoshutdown t
@@ -247,15 +308,17 @@
       eglot-report-progress nil
       eglot-send-changes-idle-time 0.1
       eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider)
-      ;; 30: supported API, replaces the jsonrpc--log-event fset hack.
       eglot-events-buffer-config '(:size 0 :format full))
 
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-stay-out-of 'font-lock)
 
   (defun core--eglot-format ()
-    (when (eglot-managed-p)
-      (ignore-errors (eglot-format-buffer))))
+    ;; gofmt is law; elsewhere only where the project says how
+    (when (and (eglot-managed-p)
+               (or (derived-mode-p 'go-mode)
+                   (locate-dominating-file default-directory ".clang-format")))
+      (with-demoted-errors "eglot-format: %S" (eglot-format-buffer))))
 
   (defun core--eglot-organize-imports ()
     (when (eglot-managed-p)
@@ -283,12 +346,8 @@
 
 ;;; LANGUAGES
 
-;; Go: hardware tabs, gofmt does the rest.
+;; Go: hardware tabs are the default; gofmt does the rest.
 ;; C gets "linux", which is already K&R with 8-wide tabs.
-(defun core--go-style ()
-  (setq-local indent-tabs-mode t tab-width 8))
-(add-hook 'go-mode-hook #'core--go-style)
-
 (setq c-default-style '((c-mode    . "linux")
                         (c++-mode  . "stroustrup")
                         (java-mode . "java")
@@ -313,6 +372,7 @@
 ;; Switched on last, so every variable is already set.
 
 (dolist (mode '(delete-selection-mode
+                editorconfig-mode
                 electric-pair-mode
                 global-subword-mode
                 global-so-long-mode

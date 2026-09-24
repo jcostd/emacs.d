@@ -25,22 +25,22 @@
   :kind 'color-scheme
   :family 'ascetic)
 
-(ascetic-theme-define ascetic-dark
-  ;; ladder: monotone toward ink, as in light.  rule is matched on Lc,
-  ;; not L* -- reverse polarity compresses, equal steps do not carry
-  ;; equal weight.
-  (paper   "#201D17")   ; L* 11  C* 5  h 88
-  (paper-1 "#29251F")   ; L* 15
-  (paper-2 "#39342C")   ; L* 22
-  (rule    "#665F50")   ; L* 40.6  Lc 18.6
+(ascetic-theme-define 'ascetic-dark
+  '(;; ladder: monotone toward ink, as in light.  rule is matched on Lc,
+    ;; not L* -- reverse polarity compresses, equal steps do not carry
+    ;; equal weight.
+    (paper   "#201D17")   ; L* 11  C* 5  h 88
+    (paper-1 "#29251F")   ; L* 15
+    (paper-2 "#39342C")   ; L* 22
+    (rule    "#665F50")   ; L* 40.6  Lc 18.6
 
-  ;; signal: band compressed by gamut, order preserved
-  (ink     "#EDE4DC")   ; 90
-  (alarm   "#FBA59F")   ; 64  h 28   always bold
-  (figure  "#94B3D8")   ; 58  h 265
-  (literal "#98BA90")   ; 58  h 138
-  (caution "#D09A5C")   ; 52  h 72   always bold
-  (mute    "#A49D95"))  ; 48  h 75   always italic
+    ;; signal: band compressed by gamut, order preserved
+    (ink     "#EDE4DC")   ; 90
+    (alarm   "#FBA59F")   ; 64  h 28   always bold
+    (figure  "#94B3D8")   ; 58  h 265
+    (literal "#98BA90")   ; 58  h 138
+    (caution "#D09A5C")   ; 52  h 72   always bold
+    (mute    "#A49D95")))  ; 48  h 75   always italic
 
 (provide-theme 'ascetic-dark)
 ;;; ascetic-dark-theme.el ends here

@@ -88,7 +88,8 @@ Arguments _CMD and _CATEGORY are ignored."
 (defun ascetic-plumber-action-ibuffer (_cmd candidates _category)
   "Materialize buffer CANDIDATES into an Ibuffer window.
 Arguments _CMD and _CATEGORY are ignored."
-  (ibuffer nil "*Plumber Buffers*" (list (cons 'name (regexp-opt candidates)))))
+  (ibuffer nil "*Plumber Buffers*"
+           `((name . ,(concat "\\`" (regexp-opt candidates) "\\'")))))
 
 (defun ascetic-plumber-action-kill-buffers (cmd candidates _category)
   "Kill CANDIDATES buffers if CMD is 'kill'.
@@ -101,22 +102,17 @@ Argument _CATEGORY is ignored."
 (defun ascetic-plumber-action-shell-async (cmd candidates _category)
   "Stream CANDIDATES to CMD via STDIN asynchronously.
 Creates a dedicated output buffer.  Argument _CATEGORY is ignored."
-  (when (not (string-empty-p cmd))
-    (let* ((clean-cmd (string-trim cmd))
-           (buf-name (format "*Plumber: %s*" clean-cmd))
-           (input-data (concat (mapconcat #'identity candidates "\n") "\n"))
-           (buf (get-buffer-create buf-name)))
-      (with-current-buffer buf
-        (erase-buffer))
-      (let ((proc (make-process
-                   :name "ascetic-plumber"
-                   :buffer buf
-                   :command (list shell-file-name shell-command-switch clean-cmd)
-                   :connection-type 'pipe)))
-        (when proc
-          (process-send-string proc input-data)
-          (process-send-eof proc)
-          (display-buffer buf))))))
+  (unless (string-empty-p cmd)
+    (with-connection-local-variables
+     (let ((proc (make-process
+                  :name "ascetic-plumber"
+                  :buffer buf
+                  :command (list shell-file-name shell-command-switch clean-cmd)
+                  :connection-type 'pipe
+                  :file-handler t)))
+       (process-send-string proc input-data)
+       (process-send-eof proc)
+       (display-buffer buf)))))
 
 (defun ascetic-plumber-action-shell-sync (cmd candidates _category)
   "Stream CANDIDATES to CMD via STDIN synchronously.
@@ -188,6 +184,8 @@ If no operator is matched, soft-fallbacks to native completion exit."
              (target-buf (window-buffer (minibuffer-selected-window))))
         (unless sink-fn
           (user-error "No action mapped for category '%s' and operator '%s'" category operator))
+        (unless (eq minibuffer-history-variable t)
+          (add-to-history minibuffer-history-variable content))
         ;; Dispatch action asynchronously to break out of the minibuffer jail
         (run-at-time 0 nil
                      (lambda (dir buf fn c cand cat)
@@ -201,13 +199,9 @@ If no operator is matched, soft-fallbacks to native completion exit."
 
 ;; --- Integration ---
 
-(defun ascetic-plumber-setup-bindings ()
-  "Bind plumber routing to minibuffer RET.
-Safe to use inside `ascetic-read-setup-hook`."
-  (local-set-key (kbd "RET") #'ascetic-plumber-commit))
-
+;; The read map is shared: bind once, not per session.
 (with-eval-after-load 'ascetic-read
-  (add-hook 'ascetic-read-setup-hook #'ascetic-plumber-setup-bindings))
+  (keymap-set ascetic-minibuffer-map "RET" #'ascetic-plumber-commit))
 
 (provide 'ascetic-plumber)
 ;;; ascetic-plumber.el ends here
