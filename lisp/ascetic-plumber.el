@@ -158,7 +158,7 @@ Returns a list containing the category, base string, and candidates."
           (substring query 0 (min base-size (length query)))
           (mapcar #'substring-no-properties raw))))
 
-(declare-function ascetic-read--submit-raw "ascetic-read")
+(declare-function ascetic-read-exit "ascetic-read")
 
 (defun ascetic-plumber-commit ()
   "Hijack RET, parse intent, and dispatch to appropriate sinks.
@@ -167,7 +167,7 @@ If no operator is matched, soft-fallbacks to native completion exit."
   (let* ((content (minibuffer-contents-no-properties))
          (plumb   (ascetic-plumber--parse-input content)))
     (if (not plumb)
-        (ascetic-read--submit-raw)
+        (ascetic-read-exit)
       (let* ((operator   (string-trim (nth 0 plumb)))
              (query      (string-trim (nth 1 plumb)))
              (cmd        (string-trim (nth 2 plumb)))
@@ -200,7 +200,7 @@ If no operator is matched, soft-fallbacks to native completion exit."
 
 ;; The read map is shared: bind once, not per session.
 (with-eval-after-load 'ascetic-read
-  (keymap-set ascetic-minibuffer-map "RET" #'ascetic-plumber-commit))
+  (keymap-set ascetic-read-map "RET" #'ascetic-plumber-commit))
 
 (provide 'ascetic-plumber)
 ;;; ascetic-plumber.el ends here

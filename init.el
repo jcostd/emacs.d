@@ -181,6 +181,7 @@
       read-buffer-completion-ignore-case t
       read-file-name-completion-ignore-case t
       read-extended-command-predicate #'command-completion-default-include-p
+      extended-command-suggest-shorter nil ; M-x: no abbreviation hints
       enable-recursive-minibuffers t
       completion-preview-minimum-symbol-length 2
       completion-preview-idle-delay 0.15
