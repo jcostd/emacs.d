@@ -159,6 +159,7 @@
       recentf-max-saved-items 100
       savehist-additional-variables '(search-ring regexp-search-ring)
       auto-revert-verbose nil
+      auto-revert-avoid-polling t
       global-auto-revert-non-file-buffers t
       uniquify-buffer-name-style 'forward
       uniquify-ignore-buffers-re "^\\*"
@@ -233,6 +234,8 @@
       display-line-numbers-width 3
       display-line-numbers-grow-only t
       isearch-lazy-count t
+      isearch-repeat-on-direction-change t
+      isearch-allow-motion t
       grep-use-headings t
       project-mode-line t
       compilation-scroll-output t
@@ -253,14 +256,10 @@
 
 ;; GNU ls; HOST covers BSD.
 (setq dired-listing-switches "-AFlbhv --group-directories-first"
-      dired-omit-files "\\`\\.?#\\|\\.DS_Store\\'\\|\\.class\\'"
       dired-recursive-copies 'always
       dired-recursive-deletes 'always
       dired-dwim-target t
       wdired-allow-to-change-permissions t)
-
-(with-eval-after-load 'dired (require 'dired-x))
-(add-hook 'dired-mode-hook #'dired-omit-mode)
 
 ;;; LANGUAGES
 ;; Go: tabs are the default, gofmt is law.  C: "linux", K&R, 8-wide tabs.
