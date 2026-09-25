@@ -24,9 +24,7 @@
 ;; Routes candidate streams to stdin of processes or Lisp sinks,
 ;; decoupling the selection mechanism from the final action.
 ;;
-;; Automatically integrates with `ascetic-read` if loaded, using
-;; `ascetic-read-setup-hook` to avoid polluting the global minibuffer
-;; environment.
+;; With `ascetic-read' loaded, takes RET in its minibuffer map.
 
 ;;; Code:
 
@@ -103,22 +101,23 @@ Argument _CATEGORY is ignored."
   "Stream CANDIDATES to CMD via STDIN asynchronously.
 Creates a dedicated output buffer.  Argument _CATEGORY is ignored."
   (unless (string-empty-p cmd)
-    (with-connection-local-variables
-     (let ((proc (make-process
+    (let* ((buf (generate-new-buffer "*Plumber Async*"))
+           (proc (make-process
                   :name "ascetic-plumber"
                   :buffer buf
-                  :command (list shell-file-name shell-command-switch clean-cmd)
+                  ;; commit already trimmed CMD
+                  :command (list shell-file-name shell-command-switch cmd)
                   :connection-type 'pipe
                   :file-handler t)))
-       (process-send-string proc input-data)
-       (process-send-eof proc)
-       (display-buffer buf)))))
+      (process-send-string proc (concat (mapconcat #'identity candidates "\n") "\n"))
+      (process-send-eof proc)
+      (display-buffer buf))))
 
 (defun ascetic-plumber-action-shell-sync (cmd candidates _category)
   "Stream CANDIDATES to CMD via STDIN synchronously.
 Inserts the command output into the current buffer.
 Argument _CATEGORY is ignored."
-  (when (not (string-empty-p cmd))
+  (unless (string-empty-p cmd)
     (let ((clean-cmd (string-trim cmd))
           (input-data (concat (mapconcat #'identity candidates "\n") "\n"))
           (target-buf (current-buffer)))

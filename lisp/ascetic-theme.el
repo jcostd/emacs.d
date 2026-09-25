@@ -120,10 +120,10 @@
     `(error   ((t :foreground ,alarm   :weight bold)))
     `(warning ((t :foreground ,caution :weight bold)))
     `(success ((t :foreground ,literal)))
-    ;; dark band is narrow: the wave carries what Lc cannot
-    `(flymake-error   ((t :underline (:style wave :color ,alarm))))
-    `(flymake-warning ((t :underline (:style wave :color ,caution))))
-    `(flymake-note    ((t :underline (:style wave :color ,figure))))
+    ;; the fringe carries it: no ink on the code
+    `(flymake-error   ((t :underline nil)))
+    `(flymake-warning ((t :underline nil)))
+    `(flymake-note    ((t :underline nil)))
     `(eglot-mode-line ((t :weight bold)))
     ;; lit on every cursor rest: must stay quiet
     `(eglot-highlight-symbol-face ((t :background ,paper-1 :weight bold)))

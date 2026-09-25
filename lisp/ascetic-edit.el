@@ -20,6 +20,7 @@
 ;;   insert-pair  M-(    wrap N sexps from `insert-pair-alist'
 ;;   electric-pair-mode  wraps an active region on open paren
 ;;   delete-indentation  M-^  join; argument takes the line below
+;;   back-to-indentation M-m  first non-blank; C-a stays column 0
 ;;   comment-line        C-x C-;  line or region
 ;;   cycle-spacing       M-SPC  squash, one, none              (29)
 ;;   zap-up-to-char      M-Z  vi's t{char}
@@ -237,13 +238,17 @@ Line-wise always: a partial line is a whole line to `comment-region'."
                   (backward-char))
                 (line-end-position)))
 	 (n (count-lines beg end))
+         ;; point's line inside the block; past it counts as the last
+         (off (count-lines beg (save-excursion
+                                 (goto-char (min (point) end))
+                                 (line-beginning-position))))
          (text (buffer-substring beg end)))
     (atomic-change-group
       (save-excursion (goto-char end) (insert "\n" text))
       (save-excursion (comment-region beg end))
       (deactivate-mark)
-      ;; the copy sits N lines below: same offset inside the block
-      (forward-line n)
+      (goto-char beg)
+      (forward-line (+ n off))
       (move-to-column col))))
 
 (defun ascetic-edit-open-below ()
@@ -258,13 +263,6 @@ Line-wise always: a partial line is a whole line to `comment-region'."
   (beginning-of-line)
   (open-line 1)
   (indent-according-to-mode))
-
-(defun ascetic-edit-home ()
-  "Go to the first non-blank, or to column zero if already there."
-  (interactive "^")
-  (let ((p (point)))
-    (back-to-indentation)
-    (when (= p (point)) (beginning-of-line))))
 
 ;;; NUMBERS
 

@@ -76,77 +76,80 @@ Set to a custom function to intercept or rewrite input.")
 (defvar ascetic-read-setup-hook nil
   "Hook run after ascetic-read minibuffer setup is complete.
 Useful for third-party extensions to bind local keys or modify state
-without polluting the global `minibuffer-setup-hook`.")
+without polluting the global `minibuffer-setup-hook'.")
 
 ;; Note: The following variables are dynamically bound in `ascetic-completing-read'.
 ;; This is robust for standard usage, but be mindful of edge cases in deeply
 ;; nested recursive minibuffer sessions.
-(defvar ascetic--collection nil
+(defvar ascetic-read--collection nil
   "Active collection.")
 
-(defvar ascetic--predicate nil
+(defvar ascetic-read--predicate nil
   "Active predicate.")
 
-(defvar ascetic--require-match nil
+(defvar ascetic-read--require-match nil
   "Strict match flag.")
 
-(defvar ascetic--default nil
-  "Default value.")
-
-(defvar ascetic--overlay nil
+(defvar ascetic-read--overlay nil
   "Rendering overlay.")
 
-(defvar ascetic--current-candidates nil
+(defvar ascetic-read--current-candidates nil
   "Displayed candidates.")
 
-(defvar ascetic--current-base-size 0
+(defvar ascetic-read--current-base-size 0
   "Candidate base size.")
 
-(defvar ascetic--history-hash nil
+(defvar ascetic-read--history-hash nil
   "O(1) history index.")
 
-(defun ascetic--remote-p (path)
+(defvar-local ascetic-read--last-input nil
+  "Input the overlay was last computed for.")
+
+(defvar-local ascetic-read--history-base nil
+  "Prefix `ascetic-read--history-hash' is keyed under.")
+
+(defun ascetic-read--remote-p (path)
   "Return t if PATH is a remote TRAMP path."
   (string-match-p "\\`/[^/|:]+:" (substitute-in-file-name path)))
 
-(defun ascetic--smart-sort (completions)
+(defun ascetic-read--smart-sort (completions)
   "Sort COMPLETIONS by history rank, then length, then text."
-  (let ((h ascetic--history-hash))
+  (let ((h ascetic-read--history-hash))
     (sort completions :in-place t
           :key (lambda (c)
                  (list (if h (gethash c h most-positive-fixnum) 0)
                        (length c) c)))))
 
-(defun ascetic--update-completions ()
+(defun ascetic-read--update-completions ()
   "Compute completions synchronously and render overlay."
-  (when ascetic--overlay
+  (when ascetic-read--overlay
     ;; Move overlay strictly to the end to prevent cursor trapping
-    (move-overlay ascetic--overlay (point-max) (point-max) (current-buffer))
+    (move-overlay ascetic-read--overlay (point-max) (point-max) (current-buffer))
     (let* ((raw-content (minibuffer-contents-no-properties))
            (content (funcall ascetic-input-filter-function raw-content)))
-      (let* ((metadata (completion-metadata content ascetic--collection ascetic--predicate))
+      (let* ((metadata (completion-metadata content ascetic-read--collection ascetic-read--predicate))
              (category (completion-metadata-get metadata 'category))
              (is-remote (and (eq category 'file)
-                             (or (ascetic--remote-p content)
-                                 (ascetic--remote-p default-directory))))
+                             (or (ascetic-read--remote-p content)
+                                 (ascetic-read--remote-p default-directory))))
              (compute-engine
               (lambda ()
 		(let ((non-essential t)
                       (gc-cons-threshold (* 64 1024 1024)))
                   (let* ((completions (completion-all-completions
-				       content ascetic--collection ascetic--predicate (length content)))
+				       content ascetic-read--collection ascetic-read--predicate (length content)))
 			 (last-cell (last completions))
 			 (base-size (if (and last-cell (numberp (cdr last-cell)))
 					(prog1 (cdr last-cell) (setcdr last-cell nil))
 				      0))
-                         (_ (ascetic--history-index (substring content 0 base-size)))
-			 ;; Note: Internal Emacs API `completion-pcm--filename-try-filter`.
+                         (_ (ascetic-read--history-index (substring content 0 base-size)))
+			 ;; Note: Internal Emacs API `completion-pcm--filename-try-filter'.
 			 ;; Subject to change, but highly optimized for file ignoring.
 			 (filtered (if (and completions (eq category 'file))
 				       (completion-pcm--filename-try-filter completions)
                                      completions))
 			 (sort-fn (or (completion-metadata-get metadata 'display-sort-function)
-				      #'ascetic--smart-sort))
+				      #'ascetic-read--smart-sort))
 			 (lst (when filtered
 				(take ascetic-max-candidates (funcall sort-fn filtered)))))
                     (cons lst base-size)))))
@@ -154,36 +157,29 @@ without polluting the global `minibuffer-setup-hook`.")
                         (funcall compute-engine)
                       (while-no-input (funcall compute-engine)))))
         (when (consp state)
-          (setq ascetic--last-input raw-content)
+          (setq ascetic-read--last-input raw-content)
           (let ((lst (car state))
                 (base-size (cdr state)))
-	    (setq ascetic--current-candidates lst)
-	    (setq ascetic--current-base-size base-size)
+	    (setq ascetic-read--current-candidates lst)
+	    (setq ascetic-read--current-base-size base-size)
 	    (if lst
                 (let ((text (concat " \n  " (mapconcat #'completion-lazy-hilit lst "\n  "))))
                   ;; Anchor the cursor exactly on the first space of the overlay.
                   ;; Since updates are now synchronous, this guarantees zero visual flicker,
                   ;; though behavior with variable-pitch fonts/scaling should be monitored.
                   (put-text-property 0 1 'cursor t text)
-                  (overlay-put ascetic--overlay 'after-string text))
-	      (overlay-put ascetic--overlay 'after-string ""))))))))
+                  (overlay-put ascetic-read--overlay 'after-string text))
+	      (overlay-put ascetic-read--overlay 'after-string ""))))))))
 
-(defvar-local ascetic--last-input nil
-  "Input the overlay was last computed for.")
-
-
-(defvar-local ascetic--history-base nil
-  "Prefix `ascetic--history-hash' is keyed under.")
-
-(defun ascetic--on-change ()
+(defun ascetic-read--on-change ()
   "Refresh the overlay if the last command moved the input."
-  (unless (equal (minibuffer-contents-no-properties) ascetic--last-input)
-    (ascetic--update-completions)))
+  (unless (equal (minibuffer-contents-no-properties) ascetic-read--last-input)
+    (ascetic-read--update-completions)))
 
-(defun ascetic--history-index (base)
+(defun ascetic-read--history-index (base)
   "Key the history index by what follows BASE in each entry.
 File history holds whole paths; candidates are only their tails."
-  (unless (equal base ascetic--history-base)
+  (unless (equal base ascetic-read--history-base)
     (let ((hv minibuffer-history-variable)
           (h (make-hash-table :test #'equal))
           (i 0))
@@ -193,79 +189,71 @@ File history holds whole paths; candidates are only their tails."
             (let ((k (substring e (length base))))
               (unless (gethash k h) (puthash k i h))))
           (setq i (1+ i))))
-      (setq ascetic--history-hash h
-            ascetic--history-base base))))
+      (setq ascetic-read--history-hash h
+            ascetic-read--history-base base))))
 
 (defun ascetic-read-refresh ()
   "Force a synchronous refresh of the completion overlay."
   (interactive)
-  (when (and ascetic--overlay (minibufferp))
-    (ascetic--update-completions)))
+  (when (and ascetic-read--overlay (minibufferp))
+    (ascetic-read--update-completions)))
 
-(defun ascetic--insert-nth (n)
+(defun ascetic-read--insert-nth (n)
   "Materialize candidate N into the prompt."
-  (interactive)
-  (let ((candidate (nth n ascetic--current-candidates)))
+  (let ((candidate (nth n ascetic-read--current-candidates)))
     (if candidate
         (progn
-          ;; Inhibit hooks to prevent double execution of `completion-all-completions`
-          (let ((inhibit-modification-hooks t))
-            (delete-region (+ (minibuffer-prompt-end) ascetic--current-base-size) (point-max))
-            (insert candidate))
-          (ascetic--update-completions))
+          (delete-region (+ (minibuffer-prompt-end) ascetic-read--current-base-size) (point-max))
+          (insert candidate))
       (minibuffer-message "No candidate %d" (1+ n)))))
 
-(defun ascetic--insert-by-chord ()
+(defun ascetic-read--insert-by-chord ()
   "Extract digit from key and materialize candidate."
   (interactive)
   (let ((idx (- (event-basic-type last-command-event) ?1)))
-    (ascetic--insert-nth idx)))
+    (ascetic-read--insert-nth idx)))
 
-(defun ascetic--submit-raw ()
+(defun ascetic-read--submit-raw ()
   "Commit prompt state, bypassing confirmation."
   (interactive)
   (let ((input (minibuffer-contents-no-properties)))
     (cond
      ;; null input always exits: the caller owns the default
      ((string-empty-p input) (exit-minibuffer))
-     ((eq ascetic--require-match t)
-      (if (test-completion input ascetic--collection ascetic--predicate)
+     ((eq ascetic-read--require-match t)
+      (if (test-completion input ascetic-read--collection ascetic-read--predicate)
           (exit-minibuffer)
         (minibuffer-message "Strict match required")))
      (t (exit-minibuffer)))))
 
-(defun ascetic--submit-first ()
+(defun ascetic-read--submit-first ()
   "Commit the top candidate immediately."
   (interactive)
-  (if ascetic--current-candidates
-      (let ((candidate (car ascetic--current-candidates)))
-        (let ((inhibit-modification-hooks t))
-          (delete-region (+ (minibuffer-prompt-end) ascetic--current-base-size) (point-max))
-          (insert candidate))
-        ;; Candidate sourced from `completion-all-completions` inherently
-        ;; passes `test-completion`. Safe to bypass manual validation and exit.
+  (if ascetic-read--current-candidates
+      (let ((candidate (car ascetic-read--current-candidates)))
+        (delete-region (+ (minibuffer-prompt-end) ascetic-read--current-base-size) (point-max))
+        (insert candidate)
+        ;; Candidate sourced from `completion-all-completions' inherently
+        ;; passes `test-completion'. Safe to bypass manual validation and exit.
         (exit-minibuffer))
-    (ascetic--submit-raw)))
+    (ascetic-read--submit-raw)))
 
-(defun ascetic--expand-lcp ()
+(defun ascetic-read--expand-lcp ()
   "Expand input to longest common prefix."
   (interactive)
   (let* ((input (minibuffer-contents-no-properties))
          (start-pos (minibuffer-prompt-end))
          (try (completion-try-completion
-               input ascetic--collection ascetic--predicate (- (point) start-pos))))
+               input ascetic-read--collection ascetic-read--predicate (- (point) start-pos))))
     (cond ((eq try t)
            (minibuffer-message "Sole completion"))
           ((consp try)
            (let ((new-text (car try))
                  (new-pos (cdr try)))
              (unless (string= input new-text)
-               ;; Inhibit hooks to prevent double execution on delete+insert
-               (let ((inhibit-modification-hooks t))
-                 (delete-region start-pos (point-max))
-                 (insert new-text)
-                 (goto-char (+ start-pos new-pos)))
-               (ascetic--update-completions))))
+               (delete-region start-pos (point-max))
+               (insert new-text)
+               (goto-char (+ start-pos new-pos)))))
           (t
            (minibuffer-message "No expansion possible")))))
 
@@ -274,29 +262,29 @@ File history holds whole paths; candidates are only their tails."
   :parent minibuffer-local-map
   "C-n"   #'ignore
   "C-p"   #'ignore
-  "TAB"   #'ascetic--expand-lcp
-  "RET"   #'ascetic--submit-raw
-  "M-RET" #'ascetic--submit-first
-  "M-j"   #'ascetic--submit-first)
+  "TAB"   #'ascetic-read--expand-lcp
+  "RET"   #'ascetic-read--submit-raw
+  "M-RET" #'ascetic-read--submit-first
+  "M-j"   #'ascetic-read--submit-first)
 
 ;; all nine: `ascetic-max-candidates' may grow at runtime
 (dotimes (i 9)
   (keymap-set ascetic-minibuffer-map (format "M-%d" (1+ i))
-              #'ascetic--insert-by-chord))
+              #'ascetic-read--insert-by-chord))
 
-(defun ascetic--minibuffer-setup ()
+(defun ascetic-read--minibuffer-setup ()
   "Initialize session context."
-  (make-local-variable 'ascetic--current-candidates)
-  (make-local-variable 'ascetic--current-base-size)
-  (make-local-variable 'ascetic--history-hash)
+  (make-local-variable 'ascetic-read--current-candidates)
+  (make-local-variable 'ascetic-read--current-base-size)
+  (make-local-variable 'ascetic-read--history-hash)
   ;; 30: styles defer their faces; only the shown few get painted
   (setq-local completion-lazy-hilit t
-              ascetic--overlay (make-overlay (point-max) (point-max))
-              ascetic--history-base nil
-              ascetic--last-input nil)
+              ascetic-read--overlay (make-overlay (point-max) (point-max))
+              ascetic-read--history-base nil
+              ascetic-read--last-input nil)
   ;; once per command, after all its edits; local, dies with the session
-  (add-hook 'post-command-hook #'ascetic--on-change nil t)
-  (ascetic--update-completions)
+  (add-hook 'post-command-hook #'ascetic-read--on-change nil t)
+  (ascetic-read--update-completions)
   (run-hooks 'ascetic-read-setup-hook))
 
 (defun ascetic-completing-read (prompt collection &optional predicate require-match
@@ -306,14 +294,13 @@ PROMPT is displayed to the user.  Candidates are drawn from COLLECTION
 and optionally filtered by PREDICATE.  REQUIRE-MATCH enforces a valid
 match.  INITIAL-INPUT, HIST, DEF and INHERIT-INPUT-METHOD have their
 standard `completing-read' meanings."
-  (let ((ascetic--collection collection)
-        (ascetic--predicate predicate)
-        (ascetic--require-match require-match)
-        (ascetic--default def)
+  (let ((ascetic-read--collection collection)
+        (ascetic-read--predicate predicate)
+        (ascetic-read--require-match require-match)
         (minibuffer-completion-table collection)
         (minibuffer-completion-predicate predicate))
     ;; one-shot: a nested read-string stays plain
-    (let ((raw (minibuffer-with-setup-hook #'ascetic--minibuffer-setup
+    (let ((raw (minibuffer-with-setup-hook #'ascetic-read--minibuffer-setup
                  (read-from-minibuffer prompt initial-input ascetic-minibuffer-map
                                        nil hist def inherit-input-method))))
       (cond ((not (string-empty-p raw)) raw)
