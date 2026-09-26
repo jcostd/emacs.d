@@ -190,7 +190,13 @@
 (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
 
 (require 'ascetic-read)
-(require 'ascetic-plumber)
+(require 'ascetic-pipe)
+
+;; Any minibuffer, any UI: ascetic-read-map inherits.  On one line
+;; M-< and M-> are C-a and C-e.
+(keymap-set minibuffer-local-map "M->" #'ascetic-pipe-to)
+(keymap-set minibuffer-local-map "M-|" #'ascetic-pipe-through)
+(keymap-set minibuffer-local-map "M-<" #'ascetic-pipe-from)
 
 (with-eval-after-load 'completion-preview
   ;; M-i is ours: text objects
@@ -218,7 +224,7 @@
       display-buffer-alist
       `((,(rx "*" (or "Help" "Apropos" "info" "Messages" "Warnings"
                       "Compile-Log" "compilation" "grep" "xref"
-                      (seq (or "Man " "Plumber") (* nonl)))
+                      (seq (or "Man " "Pipe") (* nonl)))
               "*")
          (display-buffer-reuse-window display-buffer-at-bottom)
          (window-height . 0.3)

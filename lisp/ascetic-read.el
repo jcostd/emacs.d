@@ -59,8 +59,8 @@
 (defvar-local ascetic-read--overlay nil
   "Overlay carrying the stream.")
 
-(defvar-local ascetic-read--candidates nil
-  "Candidates on screen.")
+(defvar-local ascetic-read--all nil
+  "The whole stream, sorted.  The screen shows its head.")
 
 (defvar-local ascetic-read--base 0
   "Length of the input prefix candidates leave alone.")
@@ -143,7 +143,8 @@ A complete stream is its own count."
   (string-match-p "\\`/[^/|:]+:" (substitute-in-file-name path)))
 
 (defun ascetic-read--compute (input md)
-  "Return (CANDIDATES BASE TOTAL) for INPUT under metadata MD."
+  "Return (CANDIDATES BASE) for INPUT under metadata MD.
+CANDIDATES is the whole stream, sorted."
   (let* ((all (completion-all-completions
                input minibuffer-completion-table minibuffer-completion-predicate
                (length input) md))
@@ -153,15 +154,12 @@ A complete stream is its own count."
     ;; internal API: drops ignored extensions, ./ and ../
     (when (eq (completion-metadata-get md 'category) 'file)
       (setq all (completion-pcm--filename-try-filter all)))
-    (let ((sorter (completion-metadata-get md 'display-sort-function))
-          ;; before the sort: in place, it may relink
-          (total (length all)))
+    (let ((sorter (completion-metadata-get md 'display-sort-function)))
       ;; history only if we sort
       (unless sorter
         (ascetic-read--history-index (substring input 0 base))
         (setq sorter #'ascetic-read--sort))
-      (list (take ascetic-read-max-candidates (funcall sorter all))
-            base total))))
+      (list (funcall sorter all) base))))
 
 (defun ascetic-read--update (&optional block)
   "Recompute and redraw the stream.  BLOCK: typeahead cannot abort."
@@ -181,11 +179,12 @@ A complete stream is its own count."
                     (while-no-input (ascetic-read--compute input md)))))
       ;; t: aborted by typeahead, keep the old stream
       (pcase state
-        (`(,cands ,base ,total)
+        (`(,all ,base)
          (setq ascetic-read--last-input input
-               ascetic-read--candidates cands
+               ascetic-read--all all
                ascetic-read--base base)
-         (ascetic-read--render cands total))))))
+         (ascetic-read--render (take ascetic-read-max-candidates all)
+                               (length all)))))))
 
 (defun ascetic-read--sync (&optional block)
   "Recompute if the input moved.  BLOCK as in `ascetic-read--update'."
@@ -206,7 +205,9 @@ Bare, as in `completion--replace', unless properties are allowed."
   "Insert candidate N."
   ;; act on what was typed, not on what is shown
   (ascetic-read--sync t)
-  (if-let* ((c (nth n ascetic-read--candidates)))
+  ;; numbered only on screen
+  (if-let* ((c (and (< n ascetic-read-max-candidates)
+                    (nth n ascetic-read--all))))
       (ascetic-read--replace (+ (minibuffer-prompt-end) ascetic-read--base) c)
     (minibuffer-message "No candidate %d" (1+ n))))
 
@@ -252,7 +253,7 @@ As `completing-read' does: *SCRATCH* must find *scratch*."
   "Exit with the top candidate."
   (interactive)
   (ascetic-read--sync t)
-  (if ascetic-read--candidates
+  (if ascetic-read--all
       (progn (ascetic-read--insert-nth 0)
              (exit-minibuffer))         ; from the table: it matches
     (ascetic-read-exit)))

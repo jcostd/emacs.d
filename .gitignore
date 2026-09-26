@@ -20,9 +20,9 @@ eln-cache/
 auto-save-list/
 eshell/
 history
-ielm-history.eld
-projects.eld
-recentf.eld
-bookmarks.eld
-custom.el
-places.eld
+ielm-history*
+projects*
+recentf*
+bookmarks*
+custom*
+places*

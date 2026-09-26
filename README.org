@@ -28,7 +28,7 @@ The configuration is strictly modular, separating logic from aesthetics.
 - =early-init.el= :: Pre-GUI and garbage collection optimizations.
 - =lisp/ascetic-edit.el= :: Text objects, surround, line surgery, numbers.
 - =lisp/ascetic-read.el= :: Overlay completion UI on =completing-read-function=.
-- =lisp/ascetic-plumber.el= :: Routes completion candidates to processes and Lisp sinks.
+- =lisp/ascetic-pipe.el= :: Sam's =< > |= on any minibuffer's completion set.
 - =lisp/ascetic-theme.el= :: Face engine shared by both themes.
 - =themes/ascetic-dark-theme.el= :: Primary dark theme (Anthracite background, high-contrast signal).
 - =themes/ascetic-light-theme.el= :: Primary light theme (Digital vellum, ink typography).
