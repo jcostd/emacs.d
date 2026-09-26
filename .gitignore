@@ -12,24 +12,17 @@ dist/
 
 # Backup files
 *~
+.DS_Store
 
 # Undo-tree save-files
-*.~undo-tree
-history
-ielm-history.eld
-projects
-recentf
 elpa/
 eln-cache/
-tree-sitter/
-bookmarks
-secrets.el
-custom.el
-tramp
 auto-save-list/
-places
-games/
 eshell/
-.DS_Store
-local.el
-var/
+history
+ielm-history.eld
+projects.eld
+recentf.eld
+bookmarks.eld
+custom.el
+places.eld

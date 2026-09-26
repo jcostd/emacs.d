@@ -284,15 +284,23 @@
 ;;; HOST
 
 (when (eq system-type 'darwin)
-  ;; BSD ls: no -v sort, no --group-directories-first.
   ;; Right Option types @ # [ ] on the IT layout; left stays Meta.
-  (setq dired-listing-switches "-AFlbh"
-        ns-right-alternate-modifier 'none)
+  (setq ns-command-modifier 'meta
+        ns-right-option-modifier 'none)
   ;; A Dock launch skips the login shell: name the dirs, don't source it.
-  (dolist (dir '("/opt/homebrew/bin" "/Library/TeX/texbin"))
+  ;; Pushed in order: the last one leads PATH, so rbenv shims beat Homebrew.
+  (dolist (dir (list "/opt/homebrew/bin"
+                     "/Library/TeX/texbin"
+                     (expand-file-name "~/.rbenv/shims")))
     (when (and (file-directory-p dir) (not (member dir exec-path)))
       (push dir exec-path)
-      (setenv "PATH" (concat dir path-separator (getenv "PATH"))))))
+      (setenv "PATH" (concat dir path-separator (getenv "PATH")))))
+  ;; GNU ls if coreutils is there; otherwise BSD: no --dired, no -v,
+  ;; no --group-directories-first.
+  (if-let* ((gls (executable-find "gls")))
+      (setq insert-directory-program gls)
+    (setq dired-use-ls-dired nil
+          dired-listing-switches "-AFlbh")))
 
 ;;; MODES
 ;; Switched on last, so every variable is already set.
